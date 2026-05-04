@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: WhatsApp Monitor API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: whatsapp
+    description: WhatsApp operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,103 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /whatsapp/status:
+    get:
+      operationId: getWhatsappStatus
+      tags: [whatsapp]
+      summary: Get WhatsApp connection status
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappStatus"
+
+  /whatsapp/qr:
+    get:
+      operationId: getWhatsappQr
+      tags: [whatsapp]
+      summary: Get WhatsApp QR code for linking
+      responses:
+        "200":
+          description: QR code data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCode"
+        "404":
+          description: No QR code available yet
+
+  /whatsapp/logout:
+    post:
+      operationId: logoutWhatsapp
+      tags: [whatsapp]
+      summary: Logout / unlink WhatsApp account
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /whatsapp/chats:
+    get:
+      operationId: getChats
+      tags: [whatsapp]
+      summary: Get all chats
+      responses:
+        "200":
+          description: List of chats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chat"
+
+  /whatsapp/chats/{chatId}/messages:
+    get:
+      operationId: getChatMessages
+      tags: [whatsapp]
+      summary: Get messages for a chat
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  /whatsapp/stats:
+    get:
+      operationId: getWhatsappStats
+      tags: [whatsapp]
+      summary: Get summary stats for the linked account
+      responses:
+        "200":
+          description: Stats overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +133,128 @@ components:
       required:
         - status
 
+    WhatsappStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [INITIALIZING, QR_READY, AUTHENTICATED, READY, DISCONNECTED]
+        phoneNumber:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        profilePicUrl:
+          type: string
+          nullable: true
+      required:
+        - state
+
+    QrCode:
+      type: object
+      properties:
+        qr:
+          type: string
+          description: QR code data string (to be rendered as QR image)
+        qrDataUrl:
+          type: string
+          description: Base64 data URL of QR code image
+          nullable: true
+      required:
+        - qr
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        isGroup:
+          type: boolean
+        lastMessage:
+          type: string
+          nullable: true
+        lastMessageTimestamp:
+          type: integer
+          nullable: true
+        unreadCount:
+          type: integer
+        profilePicUrl:
+          type: string
+          nullable: true
+        isArchived:
+          type: boolean
+        isMuted:
+          type: boolean
+      required:
+        - id
+        - name
+        - isGroup
+        - unreadCount
+        - isArchived
+        - isMuted
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        timestamp:
+          type: integer
+        fromMe:
+          type: boolean
+        author:
+          type: string
+          nullable: true
+        type:
+          type: string
+        hasMedia:
+          type: boolean
+        isForwarded:
+          type: boolean
+        isStarred:
+          type: boolean
+      required:
+        - id
+        - body
+        - timestamp
+        - fromMe
+        - type
+        - hasMedia
+        - isForwarded
+        - isStarred
+
+    WhatsappStats:
+      type: object
+      properties:
+        totalChats:
+          type: integer
+        totalGroups:
+          type: integer
+        totalPrivateChats:
+          type: integer
+        unreadChats:
+          type: integer
+        totalUnreadMessages:
+          type: integer
+      required:
+        - totalChats
+        - totalGroups
+        - totalPrivateChats
+        - unreadChats
+        - totalUnreadMessages

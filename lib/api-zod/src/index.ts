@@ -1,2 +1,11 @@
 export * from "./generated/api";
-export * from "./generated/types";
+export type {
+  Chat,
+  HealthStatus,
+  Message,
+  QrCode,
+  SuccessResponse,
+  WhatsappStats,
+  WhatsappStatus,
+  WhatsappStatusState,
+} from "./generated/types";
