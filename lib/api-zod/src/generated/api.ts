@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * WhatsApp Monitor API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
@@ -16,9 +16,42 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * @summary Get WhatsApp connection status
+ * @summary List all linked WhatsApp accounts
  */
-export const GetWhatsappStatusResponse = zod.object({
+export const ListAccountsResponseItem = zod.object({
+  id: zod.string(),
+  label: zod.string(),
+  createdAt: zod.string(),
+});
+export const ListAccountsResponse = zod.array(ListAccountsResponseItem);
+
+/**
+ * @summary Add a new WhatsApp account
+ */
+export const CreateAccountBody = zod.object({
+  label: zod.string(),
+});
+
+/**
+ * @summary Remove a WhatsApp account and clear its session
+ */
+export const DeleteAccountParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const DeleteAccountResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+});
+
+/**
+ * @summary Get WhatsApp connection status for an account
+ */
+export const GetAccountStatusParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const GetAccountStatusResponse = zod.object({
   state: zod.enum([
     "INITIALIZING",
     "QR_READY",
@@ -32,10 +65,14 @@ export const GetWhatsappStatusResponse = zod.object({
 });
 
 /**
- * @summary Get WhatsApp QR code for linking
+ * @summary Get QR code for linking an account
  */
-export const GetWhatsappQrResponse = zod.object({
-  qr: zod.string().describe("QR code data string (to be rendered as QR image)"),
+export const GetAccountQrParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const GetAccountQrResponse = zod.object({
+  qr: zod.string().describe("QR code data string"),
   qrDataUrl: zod
     .string()
     .nullish()
@@ -43,17 +80,25 @@ export const GetWhatsappQrResponse = zod.object({
 });
 
 /**
- * @summary Logout / unlink WhatsApp account
+ * @summary Logout / unlink a WhatsApp account (keeps the account slot)
  */
-export const LogoutWhatsappResponse = zod.object({
+export const LogoutAccountParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const LogoutAccountResponse = zod.object({
   success: zod.boolean(),
   message: zod.string(),
 });
 
 /**
- * @summary Get all chats
+ * @summary Get all chats for an account
  */
-export const GetChatsResponseItem = zod.object({
+export const GetAccountChatsParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const GetAccountChatsResponseItem = zod.object({
   id: zod.string(),
   name: zod.string(),
   isGroup: zod.boolean(),
@@ -64,22 +109,23 @@ export const GetChatsResponseItem = zod.object({
   isArchived: zod.boolean(),
   isMuted: zod.boolean(),
 });
-export const GetChatsResponse = zod.array(GetChatsResponseItem);
+export const GetAccountChatsResponse = zod.array(GetAccountChatsResponseItem);
 
 /**
- * @summary Get messages for a chat
+ * @summary Get messages for a chat within an account
  */
-export const GetChatMessagesParams = zod.object({
+export const GetAccountChatMessagesParams = zod.object({
+  accountId: zod.coerce.string(),
   chatId: zod.coerce.string(),
 });
 
-export const getChatMessagesQueryLimitDefault = 50;
+export const getAccountChatMessagesQueryLimitDefault = 50;
 
-export const GetChatMessagesQueryParams = zod.object({
-  limit: zod.coerce.number().default(getChatMessagesQueryLimitDefault),
+export const GetAccountChatMessagesQueryParams = zod.object({
+  limit: zod.coerce.number().default(getAccountChatMessagesQueryLimitDefault),
 });
 
-export const GetChatMessagesResponseItem = zod.object({
+export const GetAccountChatMessagesResponseItem = zod.object({
   id: zod.string(),
   body: zod.string(),
   timestamp: zod.number(),
@@ -90,12 +136,18 @@ export const GetChatMessagesResponseItem = zod.object({
   isForwarded: zod.boolean(),
   isStarred: zod.boolean(),
 });
-export const GetChatMessagesResponse = zod.array(GetChatMessagesResponseItem);
+export const GetAccountChatMessagesResponse = zod.array(
+  GetAccountChatMessagesResponseItem,
+);
 
 /**
- * @summary Get summary stats for the linked account
+ * @summary Get summary stats for an account
  */
-export const GetWhatsappStatsResponse = zod.object({
+export const GetAccountStatsParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const GetAccountStatsResponse = zod.object({
   totalChats: zod.number(),
   totalGroups: zod.number(),
   totalPrivateChats: zod.number(),

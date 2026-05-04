@@ -1,4 +1,6 @@
 import { createRequire } from "node:module";
+import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import type { Client as ClientType } from "whatsapp-web.js";
 import QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
@@ -10,6 +12,10 @@ const wweb = _require("whatsapp-web.js") as any;
 const Client = wweb.Client as typeof ClientType;
 const LocalAuth = wweb.LocalAuth;
 
+const CHROMIUM_PATH =
+  "/nix/store/m7qi78k6711fpwnrm4r2kn4p3ga3jal9-ungoogled-chromium-123.0.6312.105/bin/chromium";
+const ACCOUNTS_FILE = ".wwebjs_accounts.json";
+
 type State =
   | "INITIALIZING"
   | "QR_READY"
@@ -17,7 +23,13 @@ type State =
   | "READY"
   | "DISCONNECTED";
 
-interface ServiceState {
+interface AccountRecord {
+  id: string;
+  label: string;
+  createdAt: string;
+}
+
+interface AccountState {
   state: State;
   qr: string | null;
   qrDataUrl: string | null;
@@ -26,12 +38,37 @@ interface ServiceState {
   profilePicUrl: string | null;
 }
 
-class WhatsAppService {
-  private client: InstanceType<typeof ClientType>;
-  private state: ServiceState;
-  private wss: WebSocketServer | null = null;
+interface ChatLike {
+  id: { _serialized: string };
+  name: string;
+  isGroup: boolean;
+  lastMessage?: unknown;
+  unreadCount: number;
+  archived: boolean;
+  isMuted: boolean;
+}
 
-  constructor() {
+interface MessageLike {
+  id: { _serialized: string };
+  body: string;
+  timestamp: number;
+  fromMe: boolean;
+  author?: string;
+  type: string;
+  hasMedia: boolean;
+  isForwarded: boolean;
+  isStarred: boolean;
+}
+
+class WhatsAppAccount {
+  readonly id: string;
+  private client: InstanceType<typeof ClientType>;
+  private state: AccountState;
+  private manager: WhatsAppManager;
+
+  constructor(id: string, manager: WhatsAppManager) {
+    this.id = id;
+    this.manager = manager;
     this.state = {
       state: "INITIALIZING",
       qr: null,
@@ -45,10 +82,10 @@ class WhatsAppService {
 
   private createClient(): InstanceType<typeof ClientType> {
     const client = new Client({
-      authStrategy: new LocalAuth({ dataPath: ".wwebjs_auth" }),
+      authStrategy: new LocalAuth({ clientId: this.id, dataPath: ".wwebjs_auth" }),
       puppeteer: {
         headless: true,
-        executablePath: "/nix/store/m7qi78k6711fpwnrm4r2kn4p3ga3jal9-ungoogled-chromium-123.0.6312.105/bin/chromium",
+        executablePath: CHROMIUM_PATH,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -70,20 +107,21 @@ class WhatsAppService {
       } catch {
         this.state.qrDataUrl = null;
       }
-      this.broadcast({
+      this.manager.broadcast({
         type: "qr",
+        accountId: this.id,
         qr,
         qrDataUrl: this.state.qrDataUrl,
       });
-      logger.info("QR code generated");
+      logger.info({ accountId: this.id }, "QR code generated");
     });
 
     client.on("authenticated", () => {
       this.state.state = "AUTHENTICATED";
       this.state.qr = null;
       this.state.qrDataUrl = null;
-      this.broadcast({ type: "status", state: "AUTHENTICATED" });
-      logger.info("WhatsApp authenticated");
+      this.manager.broadcast({ type: "status", accountId: this.id, state: "AUTHENTICATED" });
+      logger.info({ accountId: this.id }, "WhatsApp authenticated");
     });
 
     client.on("ready", async () => {
@@ -95,29 +133,35 @@ class WhatsAppService {
       } catch {
         // ignore info fetch errors
       }
-      this.broadcast({
+      this.manager.broadcast({
         type: "status",
+        accountId: this.id,
         state: "READY",
         phoneNumber: this.state.phoneNumber,
         displayName: this.state.displayName,
       });
-      logger.info({ phone: this.state.phoneNumber }, "WhatsApp ready");
+      logger.info({ accountId: this.id, phone: this.state.phoneNumber }, "WhatsApp ready");
     });
 
     client.on("disconnected", (reason: string) => {
       this.state.state = "DISCONNECTED";
-      this.broadcast({ type: "status", state: "DISCONNECTED", reason });
-      logger.info({ reason }, "WhatsApp disconnected");
+      this.manager.broadcast({ type: "status", accountId: this.id, state: "DISCONNECTED", reason });
+      logger.info({ accountId: this.id, reason }, "WhatsApp disconnected");
     });
 
     client.on("message", (message: MessageLike) => {
-      this.broadcast({ type: "message", message: this.formatMessage(message) });
+      this.manager.broadcast({
+        type: "message",
+        accountId: this.id,
+        message: this.formatMessage(message),
+      });
     });
 
     client.on("message_create", (message: MessageLike) => {
       if (message.fromMe) {
-        this.broadcast({
+        this.manager.broadcast({
           type: "message",
+          accountId: this.id,
           message: this.formatMessage(message),
         });
       }
@@ -130,22 +174,16 @@ class WhatsAppService {
     try {
       await this.client.initialize();
     } catch (err) {
-      logger.error({ err }, "Failed to initialize WhatsApp client");
+      logger.error({ err, accountId: this.id }, "Failed to initialize WhatsApp client");
     }
   }
 
-  setWss(wss: WebSocketServer) {
-    this.wss = wss;
-  }
-
-  private broadcast(data: unknown) {
-    if (!this.wss) return;
-    const msg = JSON.stringify(data);
-    this.wss.clients.forEach((ws) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(msg);
-      }
-    });
+  async destroy() {
+    try {
+      await this.client.destroy();
+    } catch {
+      // ignore errors
+    }
   }
 
   getStatus() {
@@ -168,7 +206,7 @@ class WhatsAppService {
     try {
       await this.client.logout();
     } catch {
-      // ignore logout errors
+      // ignore
     }
     this.state = {
       state: "INITIALIZING",
@@ -190,8 +228,7 @@ class WhatsAppService {
       name: chat.name,
       isGroup: chat.isGroup,
       lastMessage: (chat.lastMessage as MessageLike | undefined)?.body ?? null,
-      lastMessageTimestamp:
-        (chat.lastMessage as MessageLike | undefined)?.timestamp ?? null,
+      lastMessageTimestamp: (chat.lastMessage as MessageLike | undefined)?.timestamp ?? null,
       unreadCount: chat.unreadCount,
       profilePicUrl: null,
       isArchived: chat.archived,
@@ -199,7 +236,7 @@ class WhatsAppService {
     }));
   }
 
-  async getChatMessages(chatId: string, limit: number = 50) {
+  async getChatMessages(chatId: string, limit = 50) {
     if (this.state.state !== "READY") return [];
     const chat = await this.client.getChatById(chatId);
     const messages = await chat.fetchMessages({ limit });
@@ -247,26 +284,100 @@ class WhatsAppService {
   }
 }
 
-interface ChatLike {
-  id: { _serialized: string };
-  name: string;
-  isGroup: boolean;
-  lastMessage?: unknown;
-  unreadCount: number;
-  archived: boolean;
-  isMuted: boolean;
+class WhatsAppManager {
+  private accounts = new Map<string, WhatsAppAccount>();
+  private records: AccountRecord[] = [];
+  private wss: WebSocketServer | null = null;
+
+  constructor() {
+    this.loadRecords();
+  }
+
+  private loadRecords() {
+    try {
+      if (existsSync(ACCOUNTS_FILE)) {
+        const raw = readFileSync(ACCOUNTS_FILE, "utf-8");
+        this.records = JSON.parse(raw) as AccountRecord[];
+      }
+    } catch {
+      this.records = [];
+    }
+  }
+
+  private saveRecords() {
+    writeFileSync(ACCOUNTS_FILE, JSON.stringify(this.records, null, 2), "utf-8");
+  }
+
+  setWss(wss: WebSocketServer) {
+    this.wss = wss;
+  }
+
+  broadcast(data: unknown) {
+    if (!this.wss) return;
+    const msg = JSON.stringify(data);
+    this.wss.clients.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(msg);
+      }
+    });
+  }
+
+  listRecords(): AccountRecord[] {
+    return this.records;
+  }
+
+  async initializeAll() {
+    for (const record of this.records) {
+      const account = new WhatsAppAccount(record.id, this);
+      this.accounts.set(record.id, account);
+      account.initialize().catch((err) => {
+        logger.error({ err, accountId: record.id }, "Account init error");
+      });
+    }
+  }
+
+  async createAccount(label: string): Promise<AccountRecord> {
+    const record: AccountRecord = {
+      id: randomUUID(),
+      label,
+      createdAt: new Date().toISOString(),
+    };
+    this.records.push(record);
+    this.saveRecords();
+    const account = new WhatsAppAccount(record.id, this);
+    this.accounts.set(record.id, account);
+    account.initialize().catch((err) => {
+      logger.error({ err, accountId: record.id }, "Account init error");
+    });
+    return record;
+  }
+
+  async removeAccount(accountId: string): Promise<boolean> {
+    const account = this.accounts.get(accountId);
+    if (!account) return false;
+    await account.destroy();
+    this.accounts.delete(accountId);
+    this.records = this.records.filter((r) => r.id !== accountId);
+    this.saveRecords();
+    try {
+      rmSync(`.wwebjs_auth/session-${accountId}`, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+    return true;
+  }
+
+  getAccount(accountId: string): WhatsAppAccount | undefined {
+    return this.accounts.get(accountId);
+  }
+
+  getAllCurrentState() {
+    const out: { accountId: string; status: ReturnType<WhatsAppAccount["getStatus"]>; qr: ReturnType<WhatsAppAccount["getQr"]> }[] = [];
+    for (const [id, account] of this.accounts) {
+      out.push({ accountId: id, status: account.getStatus(), qr: account.getQr() });
+    }
+    return out;
+  }
 }
 
-interface MessageLike {
-  id: { _serialized: string };
-  body: string;
-  timestamp: number;
-  fromMe: boolean;
-  author?: string;
-  type: string;
-  hasMedia: boolean;
-  isForwarded: boolean;
-  isStarred: boolean;
-}
-
-export const whatsappService = new WhatsAppService();
+export const whatsappManager = new WhatsAppManager();

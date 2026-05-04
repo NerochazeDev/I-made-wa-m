@@ -3,11 +3,13 @@
  * Do not edit manually.
  * Api
  * WhatsApp Monitor API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
+export * from "./account";
 export * from "./chat";
-export * from "./getChatMessagesParams";
+export * from "./createAccountBody";
+export * from "./getAccountChatMessagesParams";
 export * from "./healthStatus";
 export * from "./message";
 export * from "./qrCode";

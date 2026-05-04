@@ -8,17 +8,25 @@ import Home from "@/pages/home";
 import Chats from "@/pages/chats";
 import ChatView from "@/pages/chat";
 import Stats from "@/pages/stats";
+import { useWhatsappSocket } from "@/hooks/use-whatsapp";
 
 const queryClient = new QueryClient();
+
+function SocketBridge() {
+  useWhatsappSocket();
+  return null;
+}
 
 function Router() {
   return (
     <Layout>
+      <SocketBridge />
       <Switch>
         <Route path="/" component={Home} />
-        <Route path="/chats" component={Chats} />
-        <Route path="/chats/:chatId" component={ChatView} />
-        <Route path="/stats" component={Stats} />
+        <Route path="/accounts/:accountId" component={Home} />
+        <Route path="/accounts/:accountId/chats" component={Chats} />
+        <Route path="/accounts/:accountId/chats/:chatId" component={ChatView} />
+        <Route path="/accounts/:accountId/stats" component={Stats} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

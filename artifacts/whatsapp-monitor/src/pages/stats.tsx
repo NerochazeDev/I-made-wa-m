@@ -1,4 +1,5 @@
-import { useGetWhatsappStats, useGetChats } from "@workspace/api-client-react";
+import { useRoute } from "wouter";
+import { useGetAccountStats, useGetAccountChats, getGetAccountStatsQueryKey, getGetAccountChatsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Users, User, Mail, AlertCircle } from "lucide-react";
@@ -34,8 +35,23 @@ function StatCard({ label, value, icon, accent, loading }: StatCardProps) {
 }
 
 export default function Stats() {
-  const { data: stats, isLoading } = useGetWhatsappStats();
-  const { data: chats } = useGetChats();
+  const [, params] = useRoute("/accounts/:accountId/stats");
+  const accountId = params?.accountId ?? "";
+
+  const { data: stats, isLoading } = useGetAccountStats(accountId, {
+    query: {
+      enabled: !!accountId,
+      queryKey: getGetAccountStatsQueryKey(accountId),
+      refetchInterval: 15000,
+    },
+  });
+
+  const { data: chats } = useGetAccountChats(accountId, {
+    query: {
+      enabled: !!accountId,
+      queryKey: getGetAccountChatsQueryKey(accountId),
+    },
+  });
 
   const topUnread = chats
     ? [...chats]
@@ -99,7 +115,6 @@ export default function Stats() {
                 <div
                   key={chat.id}
                   className="flex items-center justify-between px-4 py-3 rounded-lg bg-card border border-border/50"
-                  data-testid={`stat-chat-${chat.id}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-primary" />

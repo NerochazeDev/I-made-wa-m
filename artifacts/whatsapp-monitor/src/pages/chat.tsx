@@ -1,5 +1,5 @@
 import { useRoute, Link } from "wouter";
-import { useGetChatMessages, getGetChatMessagesQueryKey } from "@workspace/api-client-react";
+import { useGetAccountChatMessages, getGetAccountChatMessagesQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,18 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function ChatView() {
-  const [, params] = useRoute("/chats/:chatId");
+  const [, params] = useRoute("/accounts/:accountId/chats/:chatId");
+  const accountId = params?.accountId ?? "";
   const chatId = params?.chatId ? decodeURIComponent(params.chatId) : "";
 
-  const { data: messages, isLoading } = useGetChatMessages(
+  const { data: messages, isLoading } = useGetAccountChatMessages(
+    accountId,
     chatId,
     { limit: 50 },
     {
       query: {
-        enabled: !!chatId,
-        queryKey: getGetChatMessagesQueryKey(chatId, { limit: 50 }),
+        enabled: !!accountId && !!chatId,
+        queryKey: getGetAccountChatMessagesQueryKey(accountId, chatId, { limit: 50 }),
       },
     }
   );
@@ -42,8 +44,8 @@ export default function ChatView() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-6 py-4 border-b border-border shrink-0 flex items-center gap-3">
-        <Link href="/chats">
-          <Button variant="ghost" size="sm" className="gap-2 font-mono" data-testid="button-back">
+        <Link href={`/accounts/${accountId}/chats`}>
+          <Button variant="ghost" size="sm" className="gap-2 font-mono">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
@@ -78,7 +80,6 @@ export default function ChatView() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                data-testid={`message-${msg.id}`}
                 className={cn("flex", msg.fromMe ? "justify-end" : "justify-start")}
               >
                 <div

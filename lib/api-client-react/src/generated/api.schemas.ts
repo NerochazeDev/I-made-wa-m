@@ -3,10 +3,20 @@
  * Do not edit manually.
  * Api
  * WhatsApp Monitor API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
+}
+
+export interface Account {
+  id: string;
+  label: string;
+  createdAt: string;
+}
+
+export interface CreateAccountBody {
+  label: string;
 }
 
 export type WhatsappStatusState =
@@ -28,7 +38,7 @@ export interface WhatsappStatus {
 }
 
 export interface QrCode {
-  /** QR code data string (to be rendered as QR image) */
+  /** QR code data string */
   qr: string;
   /** Base64 data URL of QR code image */
   qrDataUrl?: string | null;
@@ -71,6 +81,6 @@ export interface WhatsappStats {
   totalUnreadMessages: number;
 }
 
-export type GetChatMessagesParams = {
+export type GetAccountChatMessagesParams = {
   limit?: number;
 };

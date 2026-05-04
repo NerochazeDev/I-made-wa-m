@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
-import { whatsappService } from "./lib/whatsapp.js";
+import { whatsappManager } from "./lib/whatsapp.js";
 
 const rawPort = process.env["PORT"];
 
@@ -21,16 +21,17 @@ if (Number.isNaN(port) || port <= 0) {
 const httpServer = createServer(app);
 
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
-whatsappService.setWss(wss);
+whatsappManager.setWss(wss);
 
 wss.on("connection", (ws) => {
   logger.info("WebSocket client connected");
-  const status = whatsappService.getStatus();
-  ws.send(JSON.stringify({ type: "status", ...status }));
 
-  const qr = whatsappService.getQr();
-  if (qr.qr) {
-    ws.send(JSON.stringify({ type: "qr", qr: qr.qr, qrDataUrl: qr.qrDataUrl }));
+  const allState = whatsappManager.getAllCurrentState();
+  for (const { accountId, status, qr } of allState) {
+    ws.send(JSON.stringify({ type: "status", accountId, ...status }));
+    if (qr.qr) {
+      ws.send(JSON.stringify({ type: "qr", accountId, qr: qr.qr, qrDataUrl: qr.qrDataUrl }));
+    }
   }
 
   ws.on("close", () => {
@@ -40,7 +41,7 @@ wss.on("connection", (ws) => {
 
 httpServer.listen(port, () => {
   logger.info({ port }, "Server listening");
-  whatsappService.initialize().catch((err) => {
-    logger.error({ err }, "WhatsApp init error");
+  whatsappManager.initializeAll().catch((err) => {
+    logger.error({ err }, "WhatsApp manager init error");
   });
 });

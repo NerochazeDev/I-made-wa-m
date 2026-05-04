@@ -1,4 +1,5 @@
-import { useGetChats } from "@workspace/api-client-react";
+import { useRoute } from "wouter";
+import { useGetAccountChats, getGetAccountChatsQueryKey } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,16 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 export default function Chats() {
-  const { data: chats, isLoading } = useGetChats();
+  const [, params] = useRoute("/accounts/:accountId/chats");
+  const accountId = params?.accountId ?? "";
+
+  const { data: chats, isLoading } = useGetAccountChats(accountId, {
+    query: {
+      enabled: !!accountId,
+      queryKey: getGetAccountChatsQueryKey(accountId),
+      refetchInterval: 10000,
+    },
+  });
 
   const formatTime = (ts: number | null | undefined) => {
     if (!ts) return "";
@@ -51,9 +61,8 @@ export default function Chats() {
         ) : (
           <div className="p-4 space-y-1">
             {chats.map((chat) => (
-              <Link key={chat.id} href={`/chats/${encodeURIComponent(chat.id)}`}>
+              <Link key={chat.id} href={`/accounts/${accountId}/chats/${encodeURIComponent(chat.id)}`}>
                 <div
-                  data-testid={`chat-item-${chat.id}`}
                   className={cn(
                     "flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all",
                     "border-border/50 hover:border-border hover:bg-card bg-transparent",

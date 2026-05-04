@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * WhatsApp Monitor API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -17,8 +17,10 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  Account,
   Chat,
-  GetChatMessagesParams,
+  CreateAccountBody,
+  GetAccountChatMessagesParams,
   HealthStatus,
   Message,
   QrCode,
@@ -28,7 +30,7 @@ import type {
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -113,31 +115,31 @@ export function useHealthCheck<
 }
 
 /**
- * @summary Get WhatsApp connection status
+ * @summary List all linked WhatsApp accounts
  */
-export const getGetWhatsappStatusUrl = () => {
-  return `/api/whatsapp/status`;
+export const getListAccountsUrl = () => {
+  return `/api/whatsapp/accounts`;
 };
 
-export const getWhatsappStatus = async (
+export const listAccounts = async (
   options?: RequestInit,
-): Promise<WhatsappStatus> => {
-  return customFetch<WhatsappStatus>(getGetWhatsappStatusUrl(), {
+): Promise<Account[]> => {
+  return customFetch<Account[]>(getListAccountsUrl(), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetWhatsappStatusQueryKey = () => {
-  return [`/api/whatsapp/status`] as const;
+export const getListAccountsQueryKey = () => {
+  return [`/api/whatsapp/accounts`] as const;
 };
 
-export const getGetWhatsappStatusQueryOptions = <
-  TData = Awaited<ReturnType<typeof getWhatsappStatus>>,
+export const getListAccountsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAccounts>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappStatus>>,
+    Awaited<ReturnType<typeof listAccounts>>,
     TError,
     TData
   >;
@@ -145,113 +147,40 @@ export const getGetWhatsappStatusQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetWhatsappStatusQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListAccountsQueryKey();
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getWhatsappStatus>>
-  > = ({ signal }) => getWhatsappStatus({ signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappStatus>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetWhatsappStatusQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getWhatsappStatus>>
->;
-export type GetWhatsappStatusQueryError = ErrorType<unknown>;
-
-/**
- * @summary Get WhatsApp connection status
- */
-
-export function useGetWhatsappStatus<
-  TData = Awaited<ReturnType<typeof getWhatsappStatus>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappStatus>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetWhatsappStatusQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Get WhatsApp QR code for linking
- */
-export const getGetWhatsappQrUrl = () => {
-  return `/api/whatsapp/qr`;
-};
-
-export const getWhatsappQr = async (options?: RequestInit): Promise<QrCode> => {
-  return customFetch<QrCode>(getGetWhatsappQrUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetWhatsappQrQueryKey = () => {
-  return [`/api/whatsapp/qr`] as const;
-};
-
-export const getGetWhatsappQrQueryOptions = <
-  TData = Awaited<ReturnType<typeof getWhatsappQr>>,
-  TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappQr>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getGetWhatsappQrQueryKey();
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWhatsappQr>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccounts>>> = ({
     signal,
-  }) => getWhatsappQr({ signal, ...requestOptions });
+  }) => listAccounts({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappQr>>,
+    Awaited<ReturnType<typeof listAccounts>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type GetWhatsappQrQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getWhatsappQr>>
+export type ListAccountsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAccounts>>
 >;
-export type GetWhatsappQrQueryError = ErrorType<void>;
+export type ListAccountsQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get WhatsApp QR code for linking
+ * @summary List all linked WhatsApp accounts
  */
 
-export function useGetWhatsappQr<
-  TData = Awaited<ReturnType<typeof getWhatsappQr>>,
-  TError = ErrorType<void>,
+export function useListAccounts<
+  TData = Awaited<ReturnType<typeof listAccounts>>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappQr>>,
+    Awaited<ReturnType<typeof listAccounts>>,
     TError,
     TData
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetWhatsappQrQueryOptions(options);
+  const queryOptions = getListAccountsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -261,39 +190,42 @@ export function useGetWhatsappQr<
 }
 
 /**
- * @summary Logout / unlink WhatsApp account
+ * @summary Add a new WhatsApp account
  */
-export const getLogoutWhatsappUrl = () => {
-  return `/api/whatsapp/logout`;
+export const getCreateAccountUrl = () => {
+  return `/api/whatsapp/accounts`;
 };
 
-export const logoutWhatsapp = async (
+export const createAccount = async (
+  createAccountBody: CreateAccountBody,
   options?: RequestInit,
-): Promise<SuccessResponse> => {
-  return customFetch<SuccessResponse>(getLogoutWhatsappUrl(), {
+): Promise<Account> => {
+  return customFetch<Account>(getCreateAccountUrl(), {
     ...options,
     method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createAccountBody),
   });
 };
 
-export const getLogoutWhatsappMutationOptions = <
+export const getCreateAccountMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof logoutWhatsapp>>,
+    Awaited<ReturnType<typeof createAccount>>,
     TError,
-    void,
+    { data: BodyType<CreateAccountBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof logoutWhatsapp>>,
+  Awaited<ReturnType<typeof createAccount>>,
   TError,
-  void,
+  { data: BodyType<CreateAccountBody> },
   TContext
 > => {
-  const mutationKey = ["logoutWhatsapp"];
+  const mutationKey = ["createAccount"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -303,101 +235,211 @@ export const getLogoutWhatsappMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof logoutWhatsapp>>,
-    void
-  > = () => {
-    return logoutWhatsapp(requestOptions);
+    Awaited<ReturnType<typeof createAccount>>,
+    { data: BodyType<CreateAccountBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAccount(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type LogoutWhatsappMutationResult = NonNullable<
-  Awaited<ReturnType<typeof logoutWhatsapp>>
+export type CreateAccountMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAccount>>
 >;
-
-export type LogoutWhatsappMutationError = ErrorType<unknown>;
+export type CreateAccountMutationBody = BodyType<CreateAccountBody>;
+export type CreateAccountMutationError = ErrorType<unknown>;
 
 /**
- * @summary Logout / unlink WhatsApp account
+ * @summary Add a new WhatsApp account
  */
-export const useLogoutWhatsapp = <
+export const useCreateAccount = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof logoutWhatsapp>>,
+    Awaited<ReturnType<typeof createAccount>>,
     TError,
-    void,
+    { data: BodyType<CreateAccountBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof logoutWhatsapp>>,
+  Awaited<ReturnType<typeof createAccount>>,
   TError,
-  void,
+  { data: BodyType<CreateAccountBody> },
   TContext
 > => {
-  return useMutation(getLogoutWhatsappMutationOptions(options));
+  return useMutation(getCreateAccountMutationOptions(options));
 };
 
 /**
- * @summary Get all chats
+ * @summary Remove a WhatsApp account and clear its session
  */
-export const getGetChatsUrl = () => {
-  return `/api/whatsapp/chats`;
+export const getDeleteAccountUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}`;
 };
 
-export const getChats = async (options?: RequestInit): Promise<Chat[]> => {
-  return customFetch<Chat[]>(getGetChatsUrl(), {
+export const deleteAccount = async (
+  accountId: string,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getDeleteAccountUrl(accountId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAccountMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAccount>>,
+    TError,
+    { accountId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAccount>>,
+  TError,
+  { accountId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteAccount"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAccount>>,
+    { accountId: string }
+  > = (props) => {
+    const { accountId } = props ?? {};
+
+    return deleteAccount(accountId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAccountMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAccount>>
+>;
+
+export type DeleteAccountMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove a WhatsApp account and clear its session
+ */
+export const useDeleteAccount = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAccount>>,
+    TError,
+    { accountId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAccount>>,
+  TError,
+  { accountId: string },
+  TContext
+> => {
+  return useMutation(getDeleteAccountMutationOptions(options));
+};
+
+/**
+ * @summary Get WhatsApp connection status for an account
+ */
+export const getGetAccountStatusUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/status`;
+};
+
+export const getAccountStatus = async (
+  accountId: string,
+  options?: RequestInit,
+): Promise<WhatsappStatus> => {
+  return customFetch<WhatsappStatus>(getGetAccountStatusUrl(accountId), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetChatsQueryKey = () => {
-  return [`/api/whatsapp/chats`] as const;
+export const getGetAccountStatusQueryKey = (accountId: string) => {
+  return [`/api/whatsapp/accounts/${accountId}/status`] as const;
 };
 
-export const getGetChatsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChats>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getChats>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+export const getGetAccountStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountStatus>>,
+  TError = ErrorType<void>,
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetChatsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAccountStatusQueryKey(accountId);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChats>>> = ({
-    signal,
-  }) => getChats({ signal, ...requestOptions });
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountStatus>>
+  > = ({ signal }) =>
+    getAccountStatus(accountId, { signal, ...requestOptions });
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChats>>,
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!accountId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountStatus>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type GetChatsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChats>>
+export type GetAccountStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountStatus>>
 >;
-export type GetChatsQueryError = ErrorType<unknown>;
+export type GetAccountStatusQueryError = ErrorType<void>;
 
 /**
- * @summary Get all chats
+ * @summary Get WhatsApp connection status for an account
  */
 
-export function useGetChats<
-  TData = Awaited<ReturnType<typeof getChats>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getChats>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetChatsQueryOptions(options);
+export function useGetAccountStatus<
+  TData = Awaited<ReturnType<typeof getAccountStatus>>,
+  TError = ErrorType<void>,
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountStatusQueryOptions(accountId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -407,11 +449,271 @@ export function useGetChats<
 }
 
 /**
- * @summary Get messages for a chat
+ * @summary Get QR code for linking an account
  */
-export const getGetChatMessagesUrl = (
+export const getGetAccountQrUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/qr`;
+};
+
+export const getAccountQr = async (
+  accountId: string,
+  options?: RequestInit,
+): Promise<QrCode> => {
+  return customFetch<QrCode>(getGetAccountQrUrl(accountId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAccountQrQueryKey = (accountId: string) => {
+  return [`/api/whatsapp/accounts/${accountId}/qr`] as const;
+};
+
+export const getGetAccountQrQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountQr>>,
+  TError = ErrorType<void>,
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountQr>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAccountQrQueryKey(accountId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountQr>>> = ({
+    signal,
+  }) => getAccountQr(accountId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!accountId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountQr>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountQrQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountQr>>
+>;
+export type GetAccountQrQueryError = ErrorType<void>;
+
+/**
+ * @summary Get QR code for linking an account
+ */
+
+export function useGetAccountQr<
+  TData = Awaited<ReturnType<typeof getAccountQr>>,
+  TError = ErrorType<void>,
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountQr>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountQrQueryOptions(accountId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Logout / unlink a WhatsApp account (keeps the account slot)
+ */
+export const getLogoutAccountUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/logout`;
+};
+
+export const logoutAccount = async (
+  accountId: string,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getLogoutAccountUrl(accountId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getLogoutAccountMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof logoutAccount>>,
+    TError,
+    { accountId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof logoutAccount>>,
+  TError,
+  { accountId: string },
+  TContext
+> => {
+  const mutationKey = ["logoutAccount"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof logoutAccount>>,
+    { accountId: string }
+  > = (props) => {
+    const { accountId } = props ?? {};
+
+    return logoutAccount(accountId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LogoutAccountMutationResult = NonNullable<
+  Awaited<ReturnType<typeof logoutAccount>>
+>;
+
+export type LogoutAccountMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Logout / unlink a WhatsApp account (keeps the account slot)
+ */
+export const useLogoutAccount = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof logoutAccount>>,
+    TError,
+    { accountId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof logoutAccount>>,
+  TError,
+  { accountId: string },
+  TContext
+> => {
+  return useMutation(getLogoutAccountMutationOptions(options));
+};
+
+/**
+ * @summary Get all chats for an account
+ */
+export const getGetAccountChatsUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/chats`;
+};
+
+export const getAccountChats = async (
+  accountId: string,
+  options?: RequestInit,
+): Promise<Chat[]> => {
+  return customFetch<Chat[]>(getGetAccountChatsUrl(accountId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAccountChatsQueryKey = (accountId: string) => {
+  return [`/api/whatsapp/accounts/${accountId}/chats`] as const;
+};
+
+export const getGetAccountChatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountChats>>,
+  TError = ErrorType<unknown>,
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountChats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAccountChatsQueryKey(accountId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountChats>>> = ({
+    signal,
+  }) => getAccountChats(accountId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!accountId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountChats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountChatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountChats>>
+>;
+export type GetAccountChatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get all chats for an account
+ */
+
+export function useGetAccountChats<
+  TData = Awaited<ReturnType<typeof getAccountChats>>,
+  TError = ErrorType<unknown>,
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountChats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountChatsQueryOptions(accountId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get messages for a chat within an account
+ */
+export const getGetAccountChatMessagesUrl = (
+  accountId: string,
   chatId: string,
-  params?: GetChatMessagesParams,
+  params?: GetAccountChatMessagesParams,
 ) => {
   const normalizedParams = new URLSearchParams();
 
@@ -424,40 +726,46 @@ export const getGetChatMessagesUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/whatsapp/chats/${chatId}/messages?${stringifiedParams}`
-    : `/api/whatsapp/chats/${chatId}/messages`;
+    ? `/api/whatsapp/accounts/${accountId}/chats/${chatId}/messages?${stringifiedParams}`
+    : `/api/whatsapp/accounts/${accountId}/chats/${chatId}/messages`;
 };
 
-export const getChatMessages = async (
+export const getAccountChatMessages = async (
+  accountId: string,
   chatId: string,
-  params?: GetChatMessagesParams,
+  params?: GetAccountChatMessagesParams,
   options?: RequestInit,
 ): Promise<Message[]> => {
-  return customFetch<Message[]>(getGetChatMessagesUrl(chatId, params), {
-    ...options,
-    method: "GET",
-  });
+  return customFetch<Message[]>(
+    getGetAccountChatMessagesUrl(accountId, chatId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getGetChatMessagesQueryKey = (
+export const getGetAccountChatMessagesQueryKey = (
+  accountId: string,
   chatId: string,
-  params?: GetChatMessagesParams,
+  params?: GetAccountChatMessagesParams,
 ) => {
   return [
-    `/api/whatsapp/chats/${chatId}/messages`,
+    `/api/whatsapp/accounts/${accountId}/chats/${chatId}/messages`,
     ...(params ? [params] : []),
   ] as const;
 };
 
-export const getGetChatMessagesQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChatMessages>>,
+export const getGetAccountChatMessagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountChatMessages>>,
   TError = ErrorType<unknown>,
 >(
+  accountId: string,
   chatId: string,
-  params?: GetChatMessagesParams,
+  params?: GetAccountChatMessagesParams,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getChatMessages>>,
+      Awaited<ReturnType<typeof getAccountChatMessages>>,
       TError,
       TData
     >;
@@ -467,49 +775,60 @@ export const getGetChatMessagesQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetChatMessagesQueryKey(chatId, params);
+    queryOptions?.queryKey ??
+    getGetAccountChatMessagesQueryKey(accountId, chatId, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatMessages>>> = ({
-    signal,
-  }) => getChatMessages(chatId, params, { signal, ...requestOptions });
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountChatMessages>>
+  > = ({ signal }) =>
+    getAccountChatMessages(accountId, chatId, params, {
+      signal,
+      ...requestOptions,
+    });
 
   return {
     queryKey,
     queryFn,
-    enabled: !!chatId,
+    enabled: !!(accountId && chatId),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChatMessages>>,
+    Awaited<ReturnType<typeof getAccountChatMessages>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type GetChatMessagesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChatMessages>>
+export type GetAccountChatMessagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountChatMessages>>
 >;
-export type GetChatMessagesQueryError = ErrorType<unknown>;
+export type GetAccountChatMessagesQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get messages for a chat
+ * @summary Get messages for a chat within an account
  */
 
-export function useGetChatMessages<
-  TData = Awaited<ReturnType<typeof getChatMessages>>,
+export function useGetAccountChatMessages<
+  TData = Awaited<ReturnType<typeof getAccountChatMessages>>,
   TError = ErrorType<unknown>,
 >(
+  accountId: string,
   chatId: string,
-  params?: GetChatMessagesParams,
+  params?: GetAccountChatMessagesParams,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getChatMessages>>,
+      Awaited<ReturnType<typeof getAccountChatMessages>>,
       TError,
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetChatMessagesQueryOptions(chatId, params, options);
+  const queryOptions = getGetAccountChatMessagesQueryOptions(
+    accountId,
+    chatId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -519,72 +838,85 @@ export function useGetChatMessages<
 }
 
 /**
- * @summary Get summary stats for the linked account
+ * @summary Get summary stats for an account
  */
-export const getGetWhatsappStatsUrl = () => {
-  return `/api/whatsapp/stats`;
+export const getGetAccountStatsUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/stats`;
 };
 
-export const getWhatsappStats = async (
+export const getAccountStats = async (
+  accountId: string,
   options?: RequestInit,
 ): Promise<WhatsappStats> => {
-  return customFetch<WhatsappStats>(getGetWhatsappStatsUrl(), {
+  return customFetch<WhatsappStats>(getGetAccountStatsUrl(accountId), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetWhatsappStatsQueryKey = () => {
-  return [`/api/whatsapp/stats`] as const;
+export const getGetAccountStatsQueryKey = (accountId: string) => {
+  return [`/api/whatsapp/accounts/${accountId}/stats`] as const;
 };
 
-export const getGetWhatsappStatsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getWhatsappStats>>,
+export const getGetAccountStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountStats>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappStats>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetWhatsappStatsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAccountStatsQueryKey(accountId);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getWhatsappStats>>
-  > = ({ signal }) => getWhatsappStats({ signal, ...requestOptions });
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountStats>>> = ({
+    signal,
+  }) => getAccountStats(accountId, { signal, ...requestOptions });
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappStats>>,
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!accountId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountStats>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type GetWhatsappStatsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getWhatsappStats>>
+export type GetAccountStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountStats>>
 >;
-export type GetWhatsappStatsQueryError = ErrorType<unknown>;
+export type GetAccountStatsQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get summary stats for the linked account
+ * @summary Get summary stats for an account
  */
 
-export function useGetWhatsappStats<
-  TData = Awaited<ReturnType<typeof getWhatsappStats>>,
+export function useGetAccountStats<
+  TData = Awaited<ReturnType<typeof getAccountStats>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWhatsappStats>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetWhatsappStatsQueryOptions(options);
+>(
+  accountId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountStatsQueryOptions(accountId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

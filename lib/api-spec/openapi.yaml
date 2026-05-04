@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: WhatsApp Monitor API
 servers:
   - url: /api
@@ -27,11 +27,60 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  /whatsapp/status:
+  /whatsapp/accounts:
     get:
-      operationId: getWhatsappStatus
+      operationId: listAccounts
       tags: [whatsapp]
-      summary: Get WhatsApp connection status
+      summary: List all linked WhatsApp accounts
+      responses:
+        "200":
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+    post:
+      operationId: createAccount
+      tags: [whatsapp]
+      summary: Add a new WhatsApp account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountBody"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+
+  /whatsapp/accounts/{accountId}:
+    delete:
+      operationId: deleteAccount
+      tags: [whatsapp]
+      summary: Remove a WhatsApp account and clear its session
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+      responses:
+        "200":
+          description: Account removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /whatsapp/accounts/{accountId}/status:
+    get:
+      operationId: getAccountStatus
+      tags: [whatsapp]
+      summary: Get WhatsApp connection status for an account
+      parameters:
+        - $ref: "#/components/parameters/accountId"
       responses:
         "200":
           description: Connection status
@@ -39,12 +88,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WhatsappStatus"
+        "404":
+          description: Account not found
 
-  /whatsapp/qr:
+  /whatsapp/accounts/{accountId}/qr:
     get:
-      operationId: getWhatsappQr
+      operationId: getAccountQr
       tags: [whatsapp]
-      summary: Get WhatsApp QR code for linking
+      summary: Get QR code for linking an account
+      parameters:
+        - $ref: "#/components/parameters/accountId"
       responses:
         "200":
           description: QR code data
@@ -55,11 +108,13 @@ paths:
         "404":
           description: No QR code available yet
 
-  /whatsapp/logout:
+  /whatsapp/accounts/{accountId}/logout:
     post:
-      operationId: logoutWhatsapp
+      operationId: logoutAccount
       tags: [whatsapp]
-      summary: Logout / unlink WhatsApp account
+      summary: Logout / unlink a WhatsApp account (keeps the account slot)
+      parameters:
+        - $ref: "#/components/parameters/accountId"
       responses:
         "200":
           description: Logged out successfully
@@ -68,11 +123,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
-  /whatsapp/chats:
+  /whatsapp/accounts/{accountId}/chats:
     get:
-      operationId: getChats
+      operationId: getAccountChats
       tags: [whatsapp]
-      summary: Get all chats
+      summary: Get all chats for an account
+      parameters:
+        - $ref: "#/components/parameters/accountId"
       responses:
         "200":
           description: List of chats
@@ -83,12 +140,13 @@ paths:
                 items:
                   $ref: "#/components/schemas/Chat"
 
-  /whatsapp/chats/{chatId}/messages:
+  /whatsapp/accounts/{accountId}/chats/{chatId}/messages:
     get:
-      operationId: getChatMessages
+      operationId: getAccountChatMessages
       tags: [whatsapp]
-      summary: Get messages for a chat
+      summary: Get messages for a chat within an account
       parameters:
+        - $ref: "#/components/parameters/accountId"
         - name: chatId
           in: path
           required: true
@@ -110,11 +168,13 @@ paths:
                 items:
                   $ref: "#/components/schemas/Message"
 
-  /whatsapp/stats:
+  /whatsapp/accounts/{accountId}/stats:
     get:
-      operationId: getWhatsappStats
+      operationId: getAccountStats
       tags: [whatsapp]
-      summary: Get summary stats for the linked account
+      summary: Get summary stats for an account
+      parameters:
+        - $ref: "#/components/parameters/accountId"
       responses:
         "200":
           description: Stats overview
@@ -124,6 +184,14 @@ paths:
                 $ref: "#/components/schemas/WhatsappStats"
 
 components:
+  parameters:
+    accountId:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -132,6 +200,28 @@ components:
           type: string
       required:
         - status
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - label
+        - createdAt
+
+    CreateAccountBody:
+      type: object
+      properties:
+        label:
+          type: string
+      required:
+        - label
 
     WhatsappStatus:
       type: object
@@ -156,7 +246,7 @@ components:
       properties:
         qr:
           type: string
-          description: QR code data string (to be rendered as QR image)
+          description: QR code data string
         qrDataUrl:
           type: string
           description: Base64 data URL of QR code image
