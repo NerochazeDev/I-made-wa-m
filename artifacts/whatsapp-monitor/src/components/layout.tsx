@@ -1,50 +1,28 @@
 import { Link, useLocation, useRoute } from "wouter";
-import { Activity, MessageSquare, LayoutDashboard, Plus, Trash2, Loader2 } from "lucide-react";
+import { Activity, MessageSquare, LayoutDashboard, Plus, Trash2, Loader2, ChevronDown, ArrowLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useListAccounts, useCreateAccount, useDeleteAccount } from "@workspace/api-client-react";
+import { useListAccounts, useCreateAccount, useDeleteAccount, getListAccountsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { getListAccountsQueryKey } from "@workspace/api-client-react";
 
-export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+/* ─── Account Sheet ─────────────────────────────────── */
+function AccountSheet({
+  open,
+  onClose,
+  activeAccountId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  activeAccountId: string | null;
+}) {
   const queryClient = useQueryClient();
-  const { data: accounts, isLoading: loadingAccounts } = useListAccounts();
+  const { data: accounts, isLoading } = useListAccounts();
   const createAccount = useCreateAccount();
   const deleteAccount = useDeleteAccount();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("");
-
-  const [, accountParams] = useRoute("/accounts/:accountId");
-  const [, accountChatsParams] = useRoute("/accounts/:accountId/chats");
-  const [, accountStatsParams] = useRoute("/accounts/:accountId/stats");
-  const [, accountChatParams] = useRoute("/accounts/:accountId/chats/:chatId");
-
-  const activeAccountId =
-    accountParams?.accountId ??
-    accountChatsParams?.accountId ??
-    accountStatsParams?.accountId ??
-    accountChatParams?.accountId ??
-    null;
-
-  const navItems = activeAccountId
-    ? [
-        { href: `/accounts/${activeAccountId}`, label: "Status", icon: Activity },
-        { href: `/accounts/${activeAccountId}/chats`, label: "Chats", icon: MessageSquare },
-        { href: `/accounts/${activeAccountId}/stats`, label: "Overview", icon: LayoutDashboard },
-      ]
-    : [];
 
   const handleCreate = () => {
     if (!label.trim()) return;
@@ -53,23 +31,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {
         onSuccess: (account) => {
           queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey() });
-          setDialogOpen(false);
+          setAdding(false);
           setLabel("");
+          onClose();
           window.location.href = `/accounts/${account.id}`;
         },
       },
     );
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDelete = (id: string) => {
     deleteAccount.mutate(
       { accountId: id },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey() });
           if (activeAccountId === id) {
+            onClose();
             window.location.href = "/";
           }
         },
@@ -77,146 +55,227 @@ export function Layout({ children }: { children: React.ReactNode }) {
     );
   };
 
+  if (!open) return null;
+
   return (
-    <div className="flex h-screen w-full bg-background dark text-foreground">
-      <aside className="w-64 border-r border-border bg-sidebar flex flex-col">
-        <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center shrink-0">
-              <Activity className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <h1 className="font-mono font-bold tracking-tight text-lg">WA_MONITOR</h1>
-          </div>
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-[430px] bg-card rounded-t-2xl border-t border-border shadow-2xl animate-in slide-in-from-bottom-4">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h2 className="font-semibold text-base">Accounts</h2>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col">
-          {/* Accounts section */}
-          <div className="p-3 border-b border-border">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                Accounts
-              </span>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="w-5 h-5">
-                    <Plus className="w-3 h-3" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="dark">
-                  <DialogHeader>
-                    <DialogTitle className="font-mono">Add Account</DialogTitle>
-                    <DialogDescription>
-                      Give this account a label so you can tell it apart.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Input
-                    className="font-mono"
-                    placeholder="e.g. Personal, Work, Business"
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                    autoFocus
-                  />
-                  <DialogFooter>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setDialogOpen(false)}
-                      className="font-mono"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleCreate}
-                      disabled={!label.trim() || createAccount.isPending}
-                      className="font-mono"
-                    >
-                      {createAccount.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : null}
-                      Add Account
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+        <div className="px-4 pb-2 space-y-1 max-h-56 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
-
-            {loadingAccounts ? (
-              <div className="px-2 py-1">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              </div>
-            ) : !accounts || accounts.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-2 py-1 font-mono">No accounts yet</p>
-            ) : (
-              <div className="space-y-0.5">
-                {accounts.map((acc) => {
-                  const isActive = activeAccountId === acc.id;
-                  return (
-                    <Link key={acc.id} href={`/accounts/${acc.id}`}>
-                      <div
-                        className={cn(
-                          "flex items-center justify-between px-2 py-2 rounded-md cursor-pointer transition-colors group",
-                          isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
-                        )}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                          <span className="text-sm font-medium truncate">{acc.label}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="w-5 h-5 opacity-0 group-hover:opacity-100 shrink-0"
-                          onClick={(e) => handleDelete(acc.id, e)}
-                        >
-                          <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                        </Button>
+          ) : !accounts || accounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No accounts yet</p>
+          ) : (
+            accounts.map((acc) => {
+              const isActive = activeAccountId === acc.id;
+              return (
+                <div
+                  key={acc.id}
+                  className={cn(
+                    "flex items-center justify-between px-3 py-3 rounded-xl transition-colors",
+                    isActive ? "bg-primary/10 text-primary" : "hover:bg-muted",
+                  )}
+                >
+                  <Link href={`/accounts/${acc.id}`} onClick={onClose}>
+                    <div className="flex items-center gap-3 cursor-pointer">
+                      <div className={cn(
+                        "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold",
+                        isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                      )}>
+                        {acc.label.charAt(0).toUpperCase()}
                       </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Per-account nav */}
-          {navItems.length > 0 && (
-            <nav className="p-3 space-y-0.5">
-              <div className="px-2 mb-2">
-                <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                  Navigation
-                </span>
-              </div>
-              {navItems.map((item) => {
-                const isActive =
-                  location === item.href ||
-                  (location.startsWith(item.href + "/") && item.href !== `/accounts/${activeAccountId}`);
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <div
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors text-sm font-medium",
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
-                      )}
-                    >
-                      <item.icon className="w-4 h-4" />
-                      {item.label}
+                      <span className="font-medium text-sm">{acc.label}</span>
                     </div>
                   </Link>
-                );
-              })}
-            </nav>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(acc.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              );
+            })
           )}
         </div>
-      </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay z-50 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-        {children}
-      </main>
+        {adding ? (
+          <div className="px-4 pt-2 pb-4 space-y-3">
+            <Input
+              placeholder="Label (e.g. Personal, Work)"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              autoFocus
+              className="h-11"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                className="flex-1"
+                onClick={() => { setAdding(false); setLabel(""); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleCreate}
+                disabled={!label.trim() || createAccount.isPending}
+              >
+                {createAccount.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Add
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 pb-6 pt-2">
+            <Button
+              variant="outline"
+              className="w-full h-11 gap-2"
+              onClick={() => setAdding(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add Account
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ─── Layout ─────────────────────────────────────────── */
+export function Layout({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const [, params0] = useRoute("/accounts/:accountId");
+  const [, params1] = useRoute("/accounts/:accountId/chats");
+  const [, params2] = useRoute("/accounts/:accountId/stats");
+  const [, params3] = useRoute("/accounts/:accountId/chats/:chatId");
+
+  const activeAccountId =
+    params0?.accountId ??
+    params1?.accountId ??
+    params2?.accountId ??
+    params3?.accountId ??
+    null;
+
+  const isChatDetail = !!params3;
+  const chatId = params3?.chatId ? decodeURIComponent(params3.chatId) : null;
+
+  const { data: accounts } = useListAccounts();
+  const activeAccount = accounts?.find((a) => a.id === activeAccountId);
+
+  const bottomTabs = activeAccountId && !isChatDetail
+    ? [
+        { href: `/accounts/${activeAccountId}`, label: "Status", icon: Activity },
+        { href: `/accounts/${activeAccountId}/chats`, label: "Chats", icon: MessageSquare },
+        { href: `/accounts/${activeAccountId}/stats`, label: "Overview", icon: LayoutDashboard },
+      ]
+    : [];
+
+  return (
+    /* Outer phone shell */
+    <div className="flex items-center justify-center min-h-screen bg-[#111] dark">
+      <div className="relative flex flex-col w-full max-w-[430px] h-[100dvh] bg-background text-foreground overflow-hidden shadow-2xl">
+
+        {/* ── Top bar ── */}
+        <header className="shrink-0 flex items-center gap-3 px-4 h-[56px] bg-card/80 backdrop-blur-md border-b border-border/60 z-10">
+          {isChatDetail ? (
+            <>
+              <Link href={`/accounts/${activeAccountId}/chats`}>
+                <Button variant="ghost" size="icon" className="h-9 w-9 -ml-1">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate leading-tight">{chatId}</p>
+                <p className="text-[10px] text-muted-foreground">conversation</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                <Activity className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold leading-tight">WA Monitor</p>
+                {activeAccount && (
+                  <p className="text-[10px] text-muted-foreground truncate">{activeAccount.label}</p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2.5 gap-1.5 text-xs font-medium"
+                onClick={() => setSheetOpen(true)}
+              >
+                {activeAccount ? (
+                  <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">
+                    {activeAccount.label.charAt(0).toUpperCase()}
+                  </div>
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              </Button>
+            </>
+          )}
+        </header>
+
+        {/* ── Content ── */}
+        <main className={cn(
+          "flex-1 overflow-hidden flex flex-col",
+          bottomTabs.length > 0 && "pb-0",
+        )}>
+          {children}
+        </main>
+
+        {/* ── Bottom Tab Bar ── */}
+        {bottomTabs.length > 0 && (
+          <nav className="shrink-0 flex items-center border-t border-border/60 bg-card/80 backdrop-blur-md h-[60px] safe-area-bottom">
+            {bottomTabs.map((tab) => {
+              const isActive =
+                location === tab.href ||
+                (location.startsWith(tab.href + "/") && tab.href !== `/accounts/${activeAccountId}`);
+              return (
+                <Link key={tab.href} href={tab.href} className="flex-1">
+                  <div className={cn(
+                    "flex flex-col items-center justify-center gap-1 h-full cursor-pointer transition-colors",
+                    isActive ? "text-primary" : "text-muted-foreground",
+                  )}>
+                    <tab.icon className={cn("w-5 h-5 transition-transform", isActive && "scale-110")} />
+                    <span className="text-[10px] font-medium">{tab.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
+
+        {/* ── Account Sheet ── */}
+        <AccountSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          activeAccountId={activeAccountId}
+        />
+      </div>
     </div>
   );
 }

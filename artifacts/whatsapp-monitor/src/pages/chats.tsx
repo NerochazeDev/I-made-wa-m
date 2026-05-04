@@ -3,8 +3,7 @@ import { useGetAccountChats, getGetAccountChatsQueryKey } from "@workspace/api-c
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, User, MessageSquare, Archive } from "lucide-react";
+import { Users, User, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -23,102 +22,101 @@ export default function Chats() {
   const formatTime = (ts: number | null | undefined) => {
     if (!ts) return "";
     try {
-      return formatDistanceToNow(new Date(ts * 1000), { addSuffix: true });
+      return formatDistanceToNow(new Date(ts * 1000), { addSuffix: false })
+        .replace("about ", "")
+        .replace(" minutes", "m")
+        .replace(" minute", "m")
+        .replace(" hours", "h")
+        .replace(" hour", "h")
+        .replace(" days", "d")
+        .replace(" day", "d");
     } catch {
       return "";
     }
   };
 
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-8 py-6 border-b border-border shrink-0">
-        <h1 className="text-2xl font-mono font-bold">Conversations</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {chats ? `${chats.length} chats monitored` : "Loading..."}
-        </p>
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-auto">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-border/40">
+            <Skeleton className="w-12 h-12 rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-44" />
+            </div>
+            <Skeleton className="h-3 w-8" />
+          </div>
+        ))}
       </div>
+    );
+  }
 
-      <ScrollArea className="flex-1">
-        {isLoading ? (
-          <div className="p-6 space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-4 rounded-lg bg-card border border-border/50">
-                <Skeleton className="w-10 h-10 rounded-full shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-                <Skeleton className="h-3 w-16" />
+  if (!chats || chats.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        <MessageSquare className="w-14 h-14 opacity-20" />
+        <p className="text-sm font-medium">No chats yet</p>
+        <p className="text-xs">Connect your account to see conversations.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-auto">
+      {chats.map((chat) => (
+        <Link key={chat.id} href={`/accounts/${accountId}/chats/${encodeURIComponent(chat.id)}`}>
+          <div className={cn(
+            "flex items-center gap-3 px-4 py-3.5 border-b border-border/30 active:bg-muted/60 cursor-pointer transition-colors",
+            chat.unreadCount > 0 && "bg-primary/[0.03]",
+          )}>
+            {/* Avatar */}
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+              "bg-muted text-muted-foreground relative",
+            )}>
+              {chat.isGroup
+                ? <Users className="w-6 h-6" />
+                : <User className="w-6 h-6" />}
+              {chat.unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center px-1">
+                  {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                </span>
+              )}
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className={cn(
+                  "text-sm truncate mr-2",
+                  chat.unreadCount > 0 ? "font-semibold" : "font-medium",
+                )}>
+                  {chat.name}
+                </span>
+                <span className={cn(
+                  "text-[11px] shrink-0",
+                  chat.unreadCount > 0 ? "text-primary font-semibold" : "text-muted-foreground",
+                )}>
+                  {formatTime(chat.lastMessageTimestamp)}
+                </span>
               </div>
-            ))}
+              <div className="flex items-center gap-1.5">
+                {chat.isGroup && (
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-3.5 font-mono shrink-0">
+                    GROUP
+                  </Badge>
+                )}
+                {chat.lastMessage ? (
+                  <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground/50 italic">No messages</p>
+                )}
+              </div>
+            </div>
           </div>
-        ) : !chats || chats.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <MessageSquare className="w-12 h-12 mb-3 opacity-30" />
-            <p className="font-mono text-sm">NO_CHATS_AVAILABLE</p>
-            <p className="text-xs mt-1">Connect your WhatsApp account first</p>
-          </div>
-        ) : (
-          <div className="p-4 space-y-1">
-            {chats.map((chat) => (
-              <Link key={chat.id} href={`/accounts/${accountId}/chats/${encodeURIComponent(chat.id)}`}>
-                <div
-                  className={cn(
-                    "flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all",
-                    "border-border/50 hover:border-border hover:bg-card bg-transparent",
-                    chat.unreadCount > 0 && "border-primary/30 bg-primary/5"
-                  )}
-                >
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0 relative">
-                    {chat.isGroup ? (
-                      <Users className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                      <User className="w-5 h-5 text-muted-foreground" />
-                    )}
-                    {chat.unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                        {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{chat.name}</span>
-                      {chat.isGroup && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-mono shrink-0">
-                          GROUP
-                        </Badge>
-                      )}
-                      {chat.isArchived && (
-                        <Archive className="w-3 h-3 text-muted-foreground shrink-0" />
-                      )}
-                    </div>
-                    {chat.lastMessage && (
-                      <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
-                        {chat.lastMessage}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="text-right shrink-0 space-y-1">
-                    {chat.lastMessageTimestamp && (
-                      <p className="text-[10px] text-muted-foreground font-mono">
-                        {formatTime(chat.lastMessageTimestamp)}
-                      </p>
-                    )}
-                    {chat.unreadCount > 0 && (
-                      <Badge className="text-[10px] h-4 px-1.5 font-mono">
-                        {chat.unreadCount} new
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
+        </Link>
+      ))}
     </div>
   );
 }

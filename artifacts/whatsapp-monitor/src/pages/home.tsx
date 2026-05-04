@@ -1,13 +1,36 @@
 import { useRoute, Redirect } from "wouter";
-import { useGetAccountStatus, useGetAccountQr, useLogoutAccount, getGetAccountStatusQueryKey, getGetAccountQrQueryKey, useListAccounts } from "@workspace/api-client-react";
+import {
+  useGetAccountStatus,
+  useGetAccountQr,
+  useLogoutAccount,
+  useListAccounts,
+  getGetAccountStatusQueryKey,
+  getGetAccountQrQueryKey,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { LogOut, QrCode, Smartphone, CheckCircle2, ShieldAlert, Plus } from "lucide-react";
+import { LogOut, QrCode, Smartphone, CheckCircle2, ShieldAlert, Plus, Loader2 } from "lucide-react";
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
+
+function StatusPill({ state }: { state: string }) {
+  const map: Record<string, { color: string; label: string }> = {
+    READY: { color: "bg-green-500", label: "Connected" },
+    QR_READY: { color: "bg-yellow-500", label: "Scan QR" },
+    AUTHENTICATED: { color: "bg-blue-500", label: "Authenticating" },
+    INITIALIZING: { color: "bg-muted-foreground", label: "Starting" },
+    DISCONNECTED: { color: "bg-destructive", label: "Disconnected" },
+  };
+  const { color, label } = map[state] ?? { color: "bg-muted-foreground", label: state };
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={cn("w-2 h-2 rounded-full", color)} />
+      <span className="text-xs font-medium">{label}</span>
+    </div>
+  );
+}
 
 function AccountHome({ accountId }: { accountId: string }) {
-  const { data: status, isLoading } = useGetAccountStatus(accountId, {
+  const { data: status } = useGetAccountStatus(accountId, {
     query: {
       refetchInterval: 5000,
       queryKey: getGetAccountStatusQueryKey(accountId),
@@ -24,107 +47,104 @@ function AccountHome({ accountId }: { accountId: string }) {
 
   const logout = useLogoutAccount();
 
-  const handleDisconnect = () => {
-    logout.mutate({ accountId });
-  };
-
-  const isReady = status?.state === "READY";
-  const isQr = status?.state === "QR_READY";
-  const isAuth = status?.state === "AUTHENTICATED";
-  const isDisconnected = status?.state === "DISCONNECTED";
-  const isInitializing = !status || status.state === "INITIALIZING";
+  const state = status?.state ?? "INITIALIZING";
+  const isReady = state === "READY";
+  const isQr = state === "QR_READY";
+  const isAuth = state === "AUTHENTICATED";
+  const isInitializing = state === "INITIALIZING";
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <div className="px-8 py-6 border-b border-border shrink-0">
-        <h1 className="text-2xl font-mono font-bold">Connection Status</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage your WhatsApp session lifecycle.
+    <div className="flex-1 flex flex-col overflow-auto">
+      {/* Status banner */}
+      <div className="mx-4 mt-5 rounded-2xl bg-card border border-border/60 p-4">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Status</span>
+          <StatusPill state={state} />
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isInitializing && "Starting headless browser…"}
+          {isQr && "Open WhatsApp → Linked Devices → scan the code below."}
+          {isAuth && "Session authenticated, loading chats…"}
+          {isReady && `Monitoring ${status?.displayName ?? ""}${status?.phoneNumber ? ` (+${status.phoneNumber})` : ""}`}
+          {state === "DISCONNECTED" && "Session ended. Tap Reconnect to restart."}
         </p>
       </div>
 
-      <div className="p-8 max-w-2xl">
-        <Card className="border-border/60 bg-card">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              {isLoading ? (
-                <Skeleton className="w-5 h-5 rounded-full" />
-              ) : isReady ? (
-                <CheckCircle2 className="w-5 h-5 text-primary" />
-              ) : isQr || isAuth ? (
-                <QrCode className="w-5 h-5 text-yellow-500" />
-              ) : isDisconnected ? (
-                <ShieldAlert className="w-5 h-5 text-destructive" />
-              ) : (
-                <Smartphone className="w-5 h-5 text-muted-foreground" />
-              )}
-              {isLoading ? (
-                <Skeleton className="h-5 w-32" />
-              ) : (
-                <CardTitle className="font-mono text-base">
-                  {status?.state ?? "INITIALIZING"}
-                </CardTitle>
-              )}
+      {/* QR block */}
+      {isQr && (
+        <div className="flex flex-col items-center mx-4 mt-4 rounded-2xl bg-card border border-border/60 p-6 gap-4">
+          <div className="flex items-center gap-2 text-yellow-500 self-start">
+            <QrCode className="w-4 h-4" />
+            <span className="text-xs font-semibold uppercase tracking-wide">QR Code</span>
+          </div>
+          {qrData?.qrDataUrl ? (
+            <img
+              src={qrData.qrDataUrl}
+              alt="WhatsApp QR"
+              className="w-52 h-52 rounded-xl bg-white p-2"
+            />
+          ) : (
+            <div className="w-52 h-52 rounded-xl bg-muted flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
-            <CardDescription className="mt-1">
-              {isInitializing && "Starting up the headless client..."}
-              {isQr && "Scan the QR code below with your WhatsApp app to authenticate."}
-              {isAuth && "Authentication confirmed. Setting up your session..."}
-              {isReady && `Connected${status?.displayName ? ` as ${status.displayName}` : ""}${status?.phoneNumber ? ` (+${status.phoneNumber})` : ""}.`}
-              {isDisconnected && "Your session was disconnected. Refresh to reconnect."}
-            </CardDescription>
-          </CardHeader>
+          )}
+          <ol className="text-xs text-muted-foreground space-y-1 self-start list-decimal list-inside">
+            <li>Open WhatsApp on your phone</li>
+            <li>Go to Settings → Linked Devices</li>
+            <li>Tap "Link a Device" and scan</li>
+          </ol>
+        </div>
+      )}
 
-          <CardContent className="space-y-6">
-            {isQr && qrData?.qrDataUrl && (
-              <div className="flex flex-col items-center gap-4 p-6 rounded-lg bg-background/50 border border-border/50">
-                <img
-                  src={qrData.qrDataUrl}
-                  alt="WhatsApp QR Code"
-                  className="w-56 h-56 rounded-lg"
-                />
-                <div className="text-center space-y-1">
-                  <p className="text-xs text-muted-foreground font-mono">1. Open WhatsApp on your phone</p>
-                  <p className="text-xs text-muted-foreground font-mono">2. Tap Menu or Settings and select Linked Devices</p>
-                  <p className="text-xs text-muted-foreground font-mono">3. Point your phone to this screen to capture the code</p>
+      {/* Spinner for init / auth */}
+      {(isInitializing || isAuth) && (
+        <div className="flex flex-col items-center justify-center gap-3 mt-10">
+          <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm text-muted-foreground">
+            {isAuth ? "Finalising session…" : "Launching WhatsApp…"}
+          </p>
+        </div>
+      )}
+
+      {/* Ready actions */}
+      {isReady && (
+        <div className="mx-4 mt-4 space-y-3">
+          <Link href={`/accounts/${accountId}/chats`}>
+            <div className="flex items-center justify-between px-4 py-4 rounded-2xl bg-primary/10 border border-primary/20 cursor-pointer active:scale-[0.98] transition-transform">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Smartphone className="w-5 h-5 text-primary" />
                 </div>
+                <span className="font-medium text-sm text-primary">View Chats</span>
               </div>
-            )}
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+            </div>
+          </Link>
 
-            {(isInitializing || isAuth) && (
-              <div className="flex flex-col items-center gap-3 py-8">
-                <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm text-muted-foreground font-mono">
-                  {isAuth ? "Finalizing session..." : "Awaiting session readiness..."}
-                </p>
-              </div>
-            )}
+          <button
+            className="flex items-center gap-3 w-full px-4 py-3.5 rounded-2xl bg-card border border-border/60 text-sm text-muted-foreground active:bg-muted transition-colors"
+            onClick={() => logout.mutate({ accountId })}
+            disabled={logout.isPending}
+          >
+            {logout.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <LogOut className="w-4 h-4" />}
+            Disconnect account
+          </button>
+        </div>
+      )}
 
-            {isReady && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Link href={`/accounts/${accountId}/chats`}>
-                    <Button variant="secondary" className="font-mono gap-2">
-                      <Smartphone className="w-4 h-4" />
-                      View Chats
-                    </Button>
-                  </Link>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-2 text-muted-foreground hover:text-destructive font-mono"
-                  onClick={handleDisconnect}
-                  disabled={logout.isPending}
-                >
-                  <LogOut className="w-4 h-4" />
-                  Disconnect
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {state === "DISCONNECTED" && (
+        <div className="mx-4 mt-4">
+          <div className="flex items-center gap-3 px-4 py-4 rounded-2xl bg-destructive/10 border border-destructive/20">
+            <ShieldAlert className="w-5 h-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Session lost</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Restart the server to reconnect.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -134,15 +154,12 @@ export default function Home() {
   const accountId = accountParams?.accountId;
   const { data: accounts, isLoading } = useListAccounts();
 
-  if (accountId) {
-    return <AccountHome accountId={accountId} />;
-  }
+  if (accountId) return <AccountHome accountId={accountId} />;
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full items-center justify-center gap-4 text-muted-foreground">
-        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <p className="font-mono text-sm">Loading accounts...</p>
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -152,17 +169,19 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-full items-center justify-center gap-6 text-muted-foreground p-8">
-      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-        <Smartphone className="w-8 h-8 text-primary" />
+    <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 text-center">
+      <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center">
+        <Smartphone className="w-10 h-10 text-primary" />
       </div>
-      <div className="text-center space-y-2">
-        <h2 className="text-xl font-mono font-bold text-foreground">No accounts yet</h2>
-        <p className="text-sm">Add a WhatsApp account using the + button in the sidebar.</p>
+      <div>
+        <h2 className="text-lg font-bold">No accounts linked</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Tap the button above to add a WhatsApp account and start monitoring.
+        </p>
       </div>
-      <div className="flex items-center gap-2 text-xs font-mono opacity-60">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
         <Plus className="w-3 h-3" />
-        <span>Click the plus in the sidebar to get started</span>
+        <span>Use the account switcher at the top right</span>
       </div>
     </div>
   );
