@@ -19,6 +19,9 @@ import {
   GetAccountChatMessagesResponse,
   GetAccountStatsParams,
   GetAccountStatsResponse,
+  SendMessageParams,
+  SendMessageBody,
+  SendMessageResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -113,6 +116,23 @@ router.get("/whatsapp/accounts/:accountId/chats/:chatId/messages", async (req, r
   } catch (err) {
     req.log.error({ err }, "Failed to fetch messages");
     res.status(500).json({ error: "Failed to fetch messages" });
+  }
+});
+
+router.post("/whatsapp/accounts/:accountId/chats/:chatId/messages", async (req, res) => {
+  const { accountId, chatId } = SendMessageParams.parse(req.params);
+  const { body } = SendMessageBody.parse(req.body);
+  const account = whatsappManager.getAccount(accountId);
+  if (!account) {
+    res.status(404).json({ success: false, message: "Account not found" });
+    return;
+  }
+  try {
+    await account.sendMessage(chatId, body);
+    res.json(SendMessageResponse.parse({ success: true, message: "Message sent" }));
+  } catch (err) {
+    req.log.error({ err }, "Failed to send message");
+    res.status(500).json({ success: false, message: "Failed to send message" });
   }
 });
 

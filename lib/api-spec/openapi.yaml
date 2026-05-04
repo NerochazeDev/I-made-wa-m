@@ -167,6 +167,32 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [whatsapp]
+      summary: Send a message to a chat
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "200":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Account not found or not ready
 
   /whatsapp/accounts/{accountId}/stats:
     get:
@@ -328,6 +354,15 @@ components:
         - hasMedia
         - isForwarded
         - isStarred
+
+    SendMessageBody:
+      type: object
+      properties:
+        body:
+          type: string
+          description: Text content of the message
+      required:
+        - body
 
     WhatsappStats:
       type: object

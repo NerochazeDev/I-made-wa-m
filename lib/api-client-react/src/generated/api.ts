@@ -24,6 +24,7 @@ import type {
   HealthStatus,
   Message,
   QrCode,
+  SendMessageBody,
   SuccessResponse,
   WhatsappStats,
   WhatsappStatus,
@@ -836,6 +837,94 @@ export function useGetAccountChatMessages<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Send a message to a chat
+ */
+export const getSendMessageUrl = (accountId: string, chatId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/chats/${chatId}/messages`;
+};
+
+export const sendMessage = async (
+  accountId: string,
+  chatId: string,
+  sendMessageBody: SendMessageBody,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getSendMessageUrl(accountId, chatId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sendMessageBody),
+  });
+};
+
+export const getSendMessageMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendMessage>>,
+    TError,
+    { accountId: string; chatId: string; data: BodyType<SendMessageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendMessage>>,
+  TError,
+  { accountId: string; chatId: string; data: BodyType<SendMessageBody> },
+  TContext
+> => {
+  const mutationKey = ["sendMessage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendMessage>>,
+    { accountId: string; chatId: string; data: BodyType<SendMessageBody> }
+  > = (props) => {
+    const { accountId, chatId, data } = props ?? {};
+
+    return sendMessage(accountId, chatId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendMessage>>
+>;
+export type SendMessageMutationBody = BodyType<SendMessageBody>;
+export type SendMessageMutationError = ErrorType<void>;
+
+/**
+ * @summary Send a message to a chat
+ */
+export const useSendMessage = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendMessage>>,
+    TError,
+    { accountId: string; chatId: string; data: BodyType<SendMessageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendMessage>>,
+  TError,
+  { accountId: string; chatId: string; data: BodyType<SendMessageBody> },
+  TContext
+> => {
+  return useMutation(getSendMessageMutationOptions(options));
+};
 
 /**
  * @summary Get summary stats for an account

@@ -236,6 +236,14 @@ class WhatsAppAccount {
     }));
   }
 
+  async sendMessage(chatId: string, body: string) {
+    if (this.state.state !== "READY") {
+      throw new Error("Client not ready");
+    }
+    const msg = await this.client.sendMessage(chatId, body);
+    return this.formatMessage(msg as MessageLike);
+  }
+
   async getChatMessages(chatId: string, limit = 50) {
     if (this.state.state !== "READY") return [];
     const chat = await this.client.getChatById(chatId);

@@ -73,6 +73,11 @@ export interface Message {
   isStarred: boolean;
 }
 
+export interface SendMessageBody {
+  /** Text content of the message */
+  body: string;
+}
+
 export interface WhatsappStats {
   totalChats: number;
   totalGroups: number;

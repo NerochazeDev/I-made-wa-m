@@ -141,6 +141,23 @@ export const GetAccountChatMessagesResponse = zod.array(
 );
 
 /**
+ * @summary Send a message to a chat
+ */
+export const SendMessageParams = zod.object({
+  accountId: zod.coerce.string(),
+  chatId: zod.coerce.string(),
+});
+
+export const SendMessageBody = zod.object({
+  body: zod.string().describe("Text content of the message"),
+});
+
+export const SendMessageResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+});
+
+/**
  * @summary Get summary stats for an account
  */
 export const GetAccountStatsParams = zod.object({

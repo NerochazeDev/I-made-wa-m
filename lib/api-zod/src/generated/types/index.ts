@@ -13,6 +13,7 @@ export * from "./getAccountChatMessagesParams";
 export * from "./healthStatus";
 export * from "./message";
 export * from "./qrCode";
+export * from "./sendMessageBody";
 export * from "./successResponse";
 export * from "./whatsappStats";
 export * from "./whatsappStatus";
