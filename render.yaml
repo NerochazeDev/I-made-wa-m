@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: whatsapp-monitor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+    disk:
+      name: whatsapp-data
+      mountPath: /app/artifacts/api-server
+      sizeGB: 5
+    healthCheckPath: /api/whatsapp/accounts

@@ -136,6 +136,25 @@ router.post("/whatsapp/accounts/:accountId/chats/:chatId/messages", async (req, 
   }
 });
 
+router.get("/whatsapp/accounts/:accountId/messages/:messageId/media", async (req, res) => {
+  const { accountId, messageId } = req.params as { accountId: string; messageId: string };
+  const account = whatsappManager.getAccount(accountId);
+  if (!account) { res.status(404).json({ error: "Account not found" }); return; }
+  try {
+    const media = await account.getMessageMedia(decodeURIComponent(messageId));
+    if (!media) { res.status(404).json({ error: "Media not available" }); return; }
+    const buf = Buffer.from(media.data, "base64");
+    res.setHeader("Content-Type", media.mimetype);
+    res.setHeader("Content-Length", buf.length);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    if (media.filename) res.setHeader("Content-Disposition", `inline; filename="${media.filename}"`);
+    res.send(buf);
+  } catch (err) {
+    req.log.error({ err }, "Failed to serve media");
+    res.status(500).json({ error: "Failed to fetch media" });
+  }
+});
+
 router.get("/whatsapp/accounts/:accountId/stats", async (req, res) => {
   const { accountId } = GetAccountStatsParams.parse(req.params);
   const account = whatsappManager.getAccount(accountId);

@@ -14,8 +14,12 @@ const Client = wweb.Client as typeof ClientType;
 const LocalAuth = wweb.LocalAuth;
 
 const CHROMIUM_PATH =
+  process.env["CHROMIUM_PATH"] ??
   "/nix/store/m7qi78k6711fpwnrm4r2kn4p3ga3jal9-ungoogled-chromium-123.0.6312.105/bin/chromium";
 const ACCOUNTS_FILE = ".wwebjs_accounts.json";
+
+// Maximum reconnect backoff in ms (5 minutes)
+const MAX_BACKOFF_MS = 5 * 60 * 1000;
 
 type State =
   | "INITIALIZING"
@@ -59,6 +63,7 @@ interface MessageLike {
   hasMedia: boolean;
   isForwarded: boolean;
   isStarred: boolean;
+  downloadMedia?: () => Promise<{ data: string; mimetype: string; filename?: string } | null>;
 }
 
 class WhatsAppAccount {
@@ -66,6 +71,9 @@ class WhatsAppAccount {
   private client: InstanceType<typeof ClientType>;
   private state: AccountState;
   private manager: WhatsAppManager;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
 
   constructor(id: string, manager: WhatsAppManager) {
     this.id = id;
@@ -118,6 +126,7 @@ class WhatsAppAccount {
     });
 
     client.on("authenticated", () => {
+      this.reconnectAttempts = 0;
       this.state.state = "AUTHENTICATED";
       this.state.qr = null;
       this.state.qrDataUrl = null;
@@ -126,6 +135,7 @@ class WhatsAppAccount {
     });
 
     client.on("ready", async () => {
+      this.reconnectAttempts = 0;
       this.state.state = "READY";
       try {
         const info = client.info;
@@ -148,6 +158,11 @@ class WhatsAppAccount {
       this.state.state = "DISCONNECTED";
       this.manager.broadcast({ type: "status", accountId: this.id, state: "DISCONNECTED", reason });
       logger.info({ accountId: this.id, reason }, "WhatsApp disconnected");
+
+      // Don't reconnect if this was an explicit logout or the account was destroyed
+      if (this.destroyed || reason === "LOGOUT") return;
+
+      this.scheduleReconnect();
     });
 
     client.on("message", (message: MessageLike) => {
@@ -171,23 +186,46 @@ class WhatsAppAccount {
     return client;
   }
 
+  private scheduleReconnect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    // Exponential backoff: 5s, 10s, 20s, 40s … capped at 5 min
+    const delay = Math.min(5000 * Math.pow(2, this.reconnectAttempts), MAX_BACKOFF_MS);
+    this.reconnectAttempts += 1;
+    logger.info(
+      { accountId: this.id, attempt: this.reconnectAttempts, delayMs: delay },
+      "Scheduling WhatsApp reconnect",
+    );
+
+    this.reconnectTimer = setTimeout(async () => {
+      if (this.destroyed) return;
+      logger.info({ accountId: this.id, attempt: this.reconnectAttempts }, "Attempting reconnect");
+      this.state.state = "INITIALIZING";
+      this.state.qr = null;
+      this.state.qrDataUrl = null;
+      this.manager.broadcast({ type: "status", accountId: this.id, state: "INITIALIZING" });
+
+      try { await this.client.destroy(); } catch { /* ignore */ }
+      this.manager.clearLocksForAccount(this.id);
+      this.client = this.createClient();
+      await this.initialize();
+    }, delay);
+  }
+
   private clearChromiumLocks() {
     const profileDir = join(".wwebjs_auth", `session-${this.id}`);
     if (!existsSync(profileDir)) return;
-    // Recursively remove all Singleton* lock files Chromium leaves behind
-    const lockNames = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
+    const lockNames = new Set(["SingletonLock", "SingletonCookie", "SingletonSocket"]);
     const scanDir = (dir: string) => {
       let entries: string[] = [];
       try { entries = readdirSync(dir); } catch { return; }
       for (const entry of entries) {
         const full = join(dir, entry);
-        if (lockNames.includes(entry)) {
+        if (lockNames.has(entry)) {
           try { rmSync(full, { force: true }); } catch { /* ignore */ }
         }
       }
     };
     scanDir(profileDir);
-    // Also check Default/ subdirectory (Chrome's default profile folder)
     scanDir(join(profileDir, "Default"));
   }
 
@@ -199,10 +237,13 @@ class WhatsAppAccount {
       logger.error({ err, accountId: this.id }, "Failed to initialize WhatsApp client");
       this.state.state = "DISCONNECTED";
       this.manager.broadcast({ type: "status", accountId: this.id, state: "DISCONNECTED", reason: "launch_failed" });
+      if (!this.destroyed) this.scheduleReconnect();
     }
   }
 
   async destroy() {
+    this.destroyed = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     try {
       await this.client.destroy();
     } catch {
@@ -227,11 +268,15 @@ class WhatsAppAccount {
   }
 
   async logout() {
+    this.destroyed = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     try {
       await this.client.logout();
     } catch {
       // ignore
     }
+    this.destroyed = false;
+    this.reconnectAttempts = 0;
     this.state = {
       state: "INITIALIZING",
       qr: null,
@@ -273,6 +318,20 @@ class WhatsAppAccount {
     const chat = await this.client.getChatById(chatId);
     const messages = await chat.fetchMessages({ limit });
     return messages.map((m: MessageLike) => this.formatMessage(m));
+  }
+
+  async getMessageMedia(messageId: string): Promise<{ data: string; mimetype: string; filename?: string } | null> {
+    if (this.state.state !== "READY") return null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = await (this.client as any).getMessageById(messageId) as MessageLike | null;
+      if (!msg || !msg.hasMedia || !msg.downloadMedia) return null;
+      const media = await msg.downloadMedia();
+      return media;
+    } catch (err) {
+      logger.error({ err, messageId, accountId: this.id }, "Failed to download media");
+      return null;
+    }
   }
 
   async getStats() {
@@ -317,9 +376,6 @@ class WhatsAppAccount {
 }
 
 function clearAllChromiumLocks(authRoot: string) {
-  // Walk the entire auth root and remove every Singleton* file Chromium
-  // leaves behind.  These become stale after a container restart and prevent
-  // the browser from launching.
   const lockNames = new Set(["SingletonLock", "SingletonCookie", "SingletonSocket"]);
   const walk = (dir: string) => {
     let entries: string[] = [];
@@ -374,6 +430,23 @@ class WhatsAppManager {
         ws.send(msg);
       }
     });
+  }
+
+  /** Called by WhatsAppAccount during reconnect to clear its own locks */
+  clearLocksForAccount(accountId: string) {
+    const profileDir = join(this.authRoot, `session-${accountId}`);
+    const lockNames = new Set(["SingletonLock", "SingletonCookie", "SingletonSocket"]);
+    const scanDir = (dir: string) => {
+      let entries: string[] = [];
+      try { entries = readdirSync(dir); } catch { return; }
+      for (const entry of entries) {
+        if (lockNames.has(entry)) {
+          try { rmSync(join(dir, entry), { force: true }); } catch { /* ignore */ }
+        }
+      }
+    };
+    scanDir(profileDir);
+    scanDir(join(profileDir, "Default"));
   }
 
   listRecords(): AccountRecord[] {
