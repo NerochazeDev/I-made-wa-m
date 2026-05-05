@@ -1,0 +1,2 @@
+2026/05/04-22:09:01.272 120 Creating DB /home/runner/workspace/artifacts/api-server/.wwebjs_auth/session-a3eff39f-4875-4f30-9d6a-38ce04b8ef8e/Default/shared_proto_db since it was missing.
+2026/05/04-22:09:01.295 120 Reusing MANIFEST /home/runner/workspace/artifacts/api-server/.wwebjs_auth/session-a3eff39f-4875-4f30-9d6a-38ce04b8ef8e/Default/shared_proto_db/MANIFEST-000001
