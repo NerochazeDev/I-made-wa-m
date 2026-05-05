@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
-import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Client as ClientType } from "whatsapp-web.js";
 import QRCode from "qrcode";
@@ -170,11 +171,34 @@ class WhatsAppAccount {
     return client;
   }
 
+  private clearChromiumLocks() {
+    const profileDir = join(".wwebjs_auth", `session-${this.id}`);
+    if (!existsSync(profileDir)) return;
+    // Recursively remove all Singleton* lock files Chromium leaves behind
+    const lockNames = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
+    const scanDir = (dir: string) => {
+      let entries: string[] = [];
+      try { entries = readdirSync(dir); } catch { return; }
+      for (const entry of entries) {
+        const full = join(dir, entry);
+        if (lockNames.includes(entry)) {
+          try { rmSync(full, { force: true }); } catch { /* ignore */ }
+        }
+      }
+    };
+    scanDir(profileDir);
+    // Also check Default/ subdirectory (Chrome's default profile folder)
+    scanDir(join(profileDir, "Default"));
+  }
+
   async initialize() {
+    this.clearChromiumLocks();
     try {
       await this.client.initialize();
     } catch (err) {
       logger.error({ err, accountId: this.id }, "Failed to initialize WhatsApp client");
+      this.state.state = "DISCONNECTED";
+      this.manager.broadcast({ type: "status", accountId: this.id, state: "DISCONNECTED", reason: "launch_failed" });
     }
   }
 
@@ -292,12 +316,34 @@ class WhatsAppAccount {
   }
 }
 
+function clearAllChromiumLocks(authRoot: string) {
+  // Walk the entire auth root and remove every Singleton* file Chromium
+  // leaves behind.  These become stale after a container restart and prevent
+  // the browser from launching.
+  const lockNames = new Set(["SingletonLock", "SingletonCookie", "SingletonSocket"]);
+  const walk = (dir: string) => {
+    let entries: string[] = [];
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      if (lockNames.has(entry)) {
+        try { rmSync(full, { force: true }); logger.info({ file: full }, "Removed stale Chromium lock"); } catch { /* ignore */ }
+      } else {
+        walk(full);
+      }
+    }
+  };
+  if (existsSync(authRoot)) walk(authRoot);
+}
+
 class WhatsAppManager {
   private accounts = new Map<string, WhatsAppAccount>();
   private records: AccountRecord[] = [];
   private wss: WebSocketServer | null = null;
+  private readonly authRoot = ".wwebjs_auth";
 
   constructor() {
+    clearAllChromiumLocks(this.authRoot);
     this.loadRecords();
   }
 
@@ -342,6 +388,12 @@ class WhatsAppManager {
         logger.error({ err, accountId: record.id }, "Account init error");
       });
     }
+  }
+
+  async destroyAll() {
+    const destroys = Array.from(this.accounts.values()).map((a) => a.destroy());
+    await Promise.allSettled(destroys);
+    this.accounts.clear();
   }
 
   async createAccount(label: string): Promise<AccountRecord> {

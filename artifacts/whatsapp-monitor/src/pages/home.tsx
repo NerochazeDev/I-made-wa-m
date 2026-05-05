@@ -32,7 +32,12 @@ function StatusPill({ state }: { state: string }) {
 function AccountHome({ accountId }: { accountId: string }) {
   const { data: status } = useGetAccountStatus(accountId, {
     query: {
-      refetchInterval: 5000,
+      // Poll fast while booting/authenticating, slower once stable
+      refetchInterval: (q) => {
+        const s = q.state.data?.state;
+        if (s === "READY" || s === "DISCONNECTED") return 8000;
+        return 2000;
+      },
       queryKey: getGetAccountStatusQueryKey(accountId),
     },
   });
@@ -135,14 +140,24 @@ function AccountHome({ accountId }: { accountId: string }) {
       )}
 
       {state === "DISCONNECTED" && (
-        <div className="mx-4 mt-4">
+        <div className="mx-4 mt-4 space-y-3">
           <div className="flex items-center gap-3 px-4 py-4 rounded-2xl bg-destructive/10 border border-destructive/20">
             <ShieldAlert className="w-5 h-5 text-destructive shrink-0" />
             <div>
               <p className="text-sm font-medium text-destructive">Session lost</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Restart the server to reconnect.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Tap Reconnect to re-link this account.</p>
             </div>
           </div>
+          <button
+            className="flex items-center gap-3 w-full px-4 py-3.5 rounded-2xl bg-card border border-border/60 text-sm font-medium active:bg-muted transition-colors"
+            onClick={() => logout.mutate({ accountId })}
+            disabled={logout.isPending}
+          >
+            {logout.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <QrCode className="w-4 h-4" />}
+            Reconnect (re-scan QR)
+          </button>
         </div>
       )}
     </div>
