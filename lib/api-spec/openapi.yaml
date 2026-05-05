@@ -108,6 +108,31 @@ paths:
         "404":
           description: No QR code available yet
 
+  /whatsapp/accounts/{accountId}/request-pairing-code:
+    post:
+      operationId: requestPairingCode
+      tags: [whatsapp]
+      summary: Request a phone-number pairing code instead of QR
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestPairingCodeBody"
+      responses:
+        "200":
+          description: Pairing code generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestPairingCodeResponse"
+        "400":
+          description: Client not in the right state for pairing
+        "404":
+          description: Account not found
+
   /whatsapp/accounts/{accountId}/logout:
     post:
       operationId: logoutAccount
@@ -249,6 +274,24 @@ components:
       required:
         - label
 
+    RequestPairingCodeBody:
+      type: object
+      properties:
+        phoneNumber:
+          type: string
+          description: "Phone number with country code, digits only. E.g. 12345678900"
+      required:
+        - phoneNumber
+
+    RequestPairingCodeResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "8-character pairing code to enter in WhatsApp on your phone"
+      required:
+        - code
+
     WhatsappStatus:
       type: object
       properties:
@@ -264,6 +307,10 @@ components:
         profilePicUrl:
           type: string
           nullable: true
+        pairingCode:
+          type: string
+          nullable: true
+          description: "Active phone-number pairing code, if one was requested"
       required:
         - state
 

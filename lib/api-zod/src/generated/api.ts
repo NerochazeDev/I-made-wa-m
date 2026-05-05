@@ -62,6 +62,10 @@ export const GetAccountStatusResponse = zod.object({
   phoneNumber: zod.string().nullish(),
   displayName: zod.string().nullish(),
   profilePicUrl: zod.string().nullish(),
+  pairingCode: zod
+    .string()
+    .nullish()
+    .describe("Active phone-number pairing code, if one was requested"),
 });
 
 /**
@@ -77,6 +81,25 @@ export const GetAccountQrResponse = zod.object({
     .string()
     .nullish()
     .describe("Base64 data URL of QR code image"),
+});
+
+/**
+ * @summary Request a phone-number pairing code instead of QR
+ */
+export const RequestPairingCodeParams = zod.object({
+  accountId: zod.coerce.string(),
+});
+
+export const RequestPairingCodeBody = zod.object({
+  phoneNumber: zod
+    .string()
+    .describe("Phone number with country code, digits only. E.g. 12345678900"),
+});
+
+export const RequestPairingCodeResponse = zod.object({
+  code: zod
+    .string()
+    .describe("8-character pairing code to enter in WhatsApp on your phone"),
 });
 
 /**

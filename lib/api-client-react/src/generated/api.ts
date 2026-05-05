@@ -24,6 +24,8 @@ import type {
   HealthStatus,
   Message,
   QrCode,
+  RequestPairingCodeBody,
+  RequestPairingCodeResponse,
   SendMessageBody,
   SuccessResponse,
   WhatsappStats,
@@ -535,6 +537,96 @@ export function useGetAccountQr<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Request a phone-number pairing code instead of QR
+ */
+export const getRequestPairingCodeUrl = (accountId: string) => {
+  return `/api/whatsapp/accounts/${accountId}/request-pairing-code`;
+};
+
+export const requestPairingCode = async (
+  accountId: string,
+  requestPairingCodeBody: RequestPairingCodeBody,
+  options?: RequestInit,
+): Promise<RequestPairingCodeResponse> => {
+  return customFetch<RequestPairingCodeResponse>(
+    getRequestPairingCodeUrl(accountId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(requestPairingCodeBody),
+    },
+  );
+};
+
+export const getRequestPairingCodeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestPairingCode>>,
+    TError,
+    { accountId: string; data: BodyType<RequestPairingCodeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestPairingCode>>,
+  TError,
+  { accountId: string; data: BodyType<RequestPairingCodeBody> },
+  TContext
+> => {
+  const mutationKey = ["requestPairingCode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestPairingCode>>,
+    { accountId: string; data: BodyType<RequestPairingCodeBody> }
+  > = (props) => {
+    const { accountId, data } = props ?? {};
+
+    return requestPairingCode(accountId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestPairingCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestPairingCode>>
+>;
+export type RequestPairingCodeMutationBody = BodyType<RequestPairingCodeBody>;
+export type RequestPairingCodeMutationError = ErrorType<void>;
+
+/**
+ * @summary Request a phone-number pairing code instead of QR
+ */
+export const useRequestPairingCode = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestPairingCode>>,
+    TError,
+    { accountId: string; data: BodyType<RequestPairingCodeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestPairingCode>>,
+  TError,
+  { accountId: string; data: BodyType<RequestPairingCodeBody> },
+  TContext
+> => {
+  return useMutation(getRequestPairingCodeMutationOptions(options));
+};
 
 /**
  * @summary Logout / unlink a WhatsApp account (keeps the account slot)

@@ -41,6 +41,7 @@ interface AccountState {
   phoneNumber: string | null;
   displayName: string | null;
   profilePicUrl: string | null;
+  pairingCode: string | null;
 }
 
 interface ChatLike {
@@ -73,6 +74,7 @@ class WhatsAppAccount {
   private manager: WhatsAppManager;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   private destroyed = false;
 
   constructor(id: string, manager: WhatsAppManager) {
@@ -85,6 +87,7 @@ class WhatsAppAccount {
       phoneNumber: null,
       displayName: null,
       profilePicUrl: null,
+      pairingCode: null,
     };
     this.client = this.createClient();
   }
@@ -130,6 +133,7 @@ class WhatsAppAccount {
       this.state.state = "AUTHENTICATED";
       this.state.qr = null;
       this.state.qrDataUrl = null;
+      this.state.pairingCode = null;
       this.manager.broadcast({ type: "status", accountId: this.id, state: "AUTHENTICATED" });
       logger.info({ accountId: this.id }, "WhatsApp authenticated");
     });
@@ -137,6 +141,7 @@ class WhatsAppAccount {
     client.on("ready", async () => {
       this.reconnectAttempts = 0;
       this.state.state = "READY";
+      this.state.pairingCode = null;
       try {
         const info = client.info;
         this.state.phoneNumber = info.wid.user;
@@ -152,9 +157,22 @@ class WhatsAppAccount {
         displayName: this.state.displayName,
       });
       logger.info({ accountId: this.id, phone: this.state.phoneNumber }, "WhatsApp ready");
+
+      // Keep-alive: ping the WA Web socket every 30 s so the session never
+      // idles out on the server side.
+      if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = setInterval(async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (this.client as any).pupPage?.evaluate(() => 1);
+        } catch {
+          // If the page is gone the disconnected event will fire; ignore here.
+        }
+      }, 30_000);
     });
 
     client.on("disconnected", (reason: string) => {
+      if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
       this.state.state = "DISCONNECTED";
       this.manager.broadcast({ type: "status", accountId: this.id, state: "DISCONNECTED", reason });
       logger.info({ accountId: this.id, reason }, "WhatsApp disconnected");
@@ -244,6 +262,7 @@ class WhatsAppAccount {
   async destroy() {
     this.destroyed = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
     try {
       await this.client.destroy();
     } catch {
@@ -257,6 +276,7 @@ class WhatsAppAccount {
       phoneNumber: this.state.phoneNumber,
       displayName: this.state.displayName,
       profilePicUrl: this.state.profilePicUrl,
+      pairingCode: this.state.pairingCode,
     };
   }
 
@@ -284,6 +304,7 @@ class WhatsAppAccount {
       phoneNumber: null,
       displayName: null,
       profilePicUrl: null,
+      pairingCode: null,
     };
     this.client = this.createClient();
     await this.initialize();
@@ -303,6 +324,20 @@ class WhatsAppAccount {
       isArchived: chat.archived,
       isMuted: chat.isMuted,
     }));
+  }
+
+  async requestPairingCode(phoneNumber: string): Promise<string> {
+    // requestPairingCode must be called while the client is initialising
+    // (i.e. QR_READY state — the page has loaded but no auth yet).
+    if (this.state.state !== "QR_READY" && this.state.state !== "INITIALIZING") {
+      throw new Error("Client must be in QR_READY or INITIALIZING state to request a pairing code");
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const code = await (this.client as any).requestPairingCode(phoneNumber);
+    this.state.pairingCode = code as string;
+    this.manager.broadcast({ type: "pairing_code", accountId: this.id, code });
+    logger.info({ accountId: this.id, phoneNumber }, "Pairing code generated");
+    return code as string;
   }
 
   async sendMessage(chatId: string, body: string) {
@@ -362,15 +397,15 @@ class WhatsAppAccount {
 
   private formatMessage(message: MessageLike) {
     return {
-      id: message.id._serialized,
-      body: message.body,
-      timestamp: message.timestamp,
-      fromMe: message.fromMe,
+      id: message.id?._serialized ?? "",
+      body: message.body ?? "",
+      timestamp: message.timestamp ?? 0,
+      fromMe: message.fromMe ?? false,
       author: message.author ?? null,
-      type: message.type,
-      hasMedia: message.hasMedia,
-      isForwarded: message.isForwarded,
-      isStarred: message.isStarred,
+      type: message.type ?? "chat",
+      hasMedia: message.hasMedia ?? false,
+      isForwarded: message.isForwarded ?? false,
+      isStarred: message.isStarred ?? false,
     };
   }
 }

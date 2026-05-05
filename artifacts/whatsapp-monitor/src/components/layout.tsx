@@ -1,7 +1,7 @@
 import { Link, useLocation, useRoute } from "wouter";
 import { Activity, MessageSquare, LayoutDashboard, Plus, Trash2, Loader2, ChevronDown, ArrowLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useListAccounts, useCreateAccount, useDeleteAccount, getListAccountsQueryKey } from "@workspace/api-client-react";
+import { useListAccounts, useCreateAccount, useDeleteAccount, useGetAccountChats, getListAccountsQueryKey, getGetAccountChatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -182,6 +182,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { data: accounts } = useListAccounts();
   const activeAccount = accounts?.find((a) => a.id === activeAccountId);
 
+  // Look up the chat name from the already-cached chats list (no extra fetch)
+  const { data: cachedChats } = useGetAccountChats(
+    activeAccountId ?? "",
+    {
+      query: {
+        enabled: isChatDetail && !!activeAccountId,
+        queryKey: getGetAccountChatsQueryKey(activeAccountId ?? ""),
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchInterval: false,
+      },
+    },
+  );
+  const chatName = chatId
+    ? (cachedChats?.find((c) => c.id === chatId)?.name ?? chatId.split("@")[0])
+    : null;
+
   const bottomTabs = activeAccountId && !isChatDetail
     ? [
         { href: `/accounts/${activeAccountId}`, label: "Status", icon: Activity },
@@ -205,7 +223,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               </Link>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate leading-tight">{chatId}</p>
+                <p className="text-sm font-semibold truncate leading-tight">{chatName}</p>
                 <p className="text-[10px] text-muted-foreground">conversation</p>
               </div>
             </>

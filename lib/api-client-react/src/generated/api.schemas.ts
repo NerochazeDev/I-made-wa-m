@@ -19,6 +19,16 @@ export interface CreateAccountBody {
   label: string;
 }
 
+export interface RequestPairingCodeBody {
+  /** Phone number with country code, digits only. E.g. 12345678900 */
+  phoneNumber: string;
+}
+
+export interface RequestPairingCodeResponse {
+  /** 8-character pairing code to enter in WhatsApp on your phone */
+  code: string;
+}
+
 export type WhatsappStatusState =
   (typeof WhatsappStatusState)[keyof typeof WhatsappStatusState];
 
@@ -35,6 +45,8 @@ export interface WhatsappStatus {
   phoneNumber?: string | null;
   displayName?: string | null;
   profilePicUrl?: string | null;
+  /** Active phone-number pairing code, if one was requested */
+  pairingCode?: string | null;
 }
 
 export interface QrCode {

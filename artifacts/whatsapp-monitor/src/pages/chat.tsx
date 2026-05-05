@@ -161,7 +161,16 @@ export default function ChatView() {
     accountId,
     chatId,
     { limit: 50 },
-    { query: { enabled: !!accountId && !!chatId, queryKey: qk, refetchInterval: 4000 } },
+    {
+      query: {
+        enabled: !!accountId && !!chatId,
+        queryKey: qk,
+        staleTime: 15000,
+        gcTime: 5 * 60 * 1000,
+        refetchInterval: 5000,
+        refetchOnWindowFocus: false,
+      },
+    },
   );
 
   const send = useSendMessage({

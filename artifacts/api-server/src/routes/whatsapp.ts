@@ -22,6 +22,9 @@ import {
   SendMessageParams,
   SendMessageBody,
   SendMessageResponse,
+  RequestPairingCodeParams,
+  RequestPairingCodeBody,
+  RequestPairingCodeResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -71,6 +74,20 @@ router.get("/whatsapp/accounts/:accountId/qr", (req, res) => {
   res.json(GetAccountQrResponse.parse(qrData));
 });
 
+router.post("/whatsapp/accounts/:accountId/request-pairing-code", async (req, res) => {
+  const { accountId } = RequestPairingCodeParams.parse(req.params);
+  const { phoneNumber } = RequestPairingCodeBody.parse(req.body);
+  const account = whatsappManager.getAccount(accountId);
+  if (!account) { res.status(404).json({ success: false, message: "Account not found" }); return; }
+  try {
+    const code = await account.requestPairingCode(phoneNumber);
+    res.json(RequestPairingCodeResponse.parse({ code }));
+  } catch (err) {
+    req.log.error({ err }, "Failed to request pairing code");
+    res.status(400).json({ success: false, message: (err as Error).message });
+  }
+});
+
 router.post("/whatsapp/accounts/:accountId/logout", async (req, res) => {
   const { accountId } = LogoutAccountParams.parse(req.params);
   const account = whatsappManager.getAccount(accountId);
@@ -111,11 +128,13 @@ router.get("/whatsapp/accounts/:accountId/chats/:chatId/messages", async (req, r
     return;
   }
   try {
-    const messages = await account.getChatMessages(chatId, limit);
-    res.json(GetAccountChatMessagesResponse.parse(messages));
+    const messages = await account.getChatMessages(chatId, limit ?? 50);
+    // Parse loosely — skip any messages that fail individual validation
+    const safe = messages.filter((m) => m.id && m.id.length > 0);
+    res.json(GetAccountChatMessagesResponse.parse(safe));
   } catch (err) {
-    req.log.error({ err }, "Failed to fetch messages");
-    res.status(500).json({ error: "Failed to fetch messages" });
+    req.log.error({ err, chatId }, "Failed to fetch messages");
+    res.status(500).json({ error: "Failed to fetch messages", detail: String(err) });
   }
 });
 

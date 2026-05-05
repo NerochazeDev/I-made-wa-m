@@ -15,7 +15,11 @@ export default function Chats() {
     query: {
       enabled: !!accountId,
       queryKey: getGetAccountChatsQueryKey(accountId),
-      refetchInterval: 10000,
+      // Keep cached data for 2 min — navigating back to this page is instant
+      staleTime: 2 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchInterval: 30000,
+      refetchOnWindowFocus: false,
     },
   });
 

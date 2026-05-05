@@ -12,4 +12,6 @@ export interface WhatsappStatus {
   phoneNumber?: string | null;
   displayName?: string | null;
   profilePicUrl?: string | null;
+  /** Active phone-number pairing code, if one was requested */
+  pairingCode?: string | null;
 }
